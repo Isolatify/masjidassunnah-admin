@@ -78,27 +78,63 @@ export default function InviteLoginPage() {
   useEffect(() => {
     document.title = "Invite Login — Masjid As Sunnah Admin";
 
-    const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
-    const params = new URLSearchParams(hash);
-    const hashError = params.get("error_description") || params.get("error") || "";
-    if (hashError) {
-      setError(
-        hashError.toLowerCase().includes("expired") || hashError.toLowerCase().includes("invalid")
-          ? "This invitation link is invalid or has expired. Ask an administrator to resend it."
-          : hashError
-      );
-      setPhase("expired");
-      return;
-    }
-
     let cancelled = false;
     const apply = (session: { user?: { email?: string | null } | null } | null) => {
       if (cancelled || !session) return;
       setPhase("password");
       setEmail(session.user?.email ?? "");
     };
+    const EXPIRED =
+      "This invitation link is invalid or has expired. Ask an administrator to resend it.";
+    const expire = (msg: string) => {
+      setError(msg);
+      setPhase("expired");
+    };
 
-    supabase.auth.getSession().then(({ data }) => apply(data.session));
+    const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
+    const hashParams = new URLSearchParams(hash);
+    const hashError = hashParams.get("error_description") || hashParams.get("error") || "";
+
+    // Our own invite links carry ?token_hash= — exchange it for a session with
+    // verifyOtp() (the raw action_link's implicit #access_token redirect is
+    // incompatible with the PKCE browser client).
+    const query = new URLSearchParams(window.location.search);
+    const tokenHash = query.get("token_hash");
+
+    // Defer every state transition into the promise chain — calling setState
+    // directly in the effect body trips react-hooks/set-state-in-effect.
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      if (hashError) {
+        expire(
+          hashError.toLowerCase().includes("expired") ||
+            hashError.toLowerCase().includes("invalid")
+            ? EXPIRED
+            : hashError
+        );
+        return;
+      }
+      if (tokenHash) {
+        window.history.replaceState({}, "", window.location.pathname);
+        supabase.auth
+          .verifyOtp({ token_hash: tokenHash, type: "invite" })
+          .then(({ data, error }) => {
+            if (cancelled) return;
+            if (error) {
+              expire(EXPIRED);
+              return;
+            }
+            apply(data.session);
+          })
+          .catch(() => {
+            if (cancelled) return;
+            expire(EXPIRED);
+          });
+        return;
+      }
+      supabase.auth.getSession().then(({ data }) => apply(data.session));
+    });
+
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => apply(session));
 
     const timer = setTimeout(() => {

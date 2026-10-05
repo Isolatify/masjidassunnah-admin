@@ -1,82 +1,302 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
+import {
+  getNextPrayer,
+  getCountdownParts,
+  parseTimeToMins,
+  type Week,
+} from "@/lib/prayerTimes";
 
-function StatCard({ label, value, icon, gold }: { label: string; value: string | number; icon: React.ReactNode; gold?: boolean }) {
+interface EventRow {
+  id: string;
+  title: string;
+  status: string;
+  date_start: string;
+  date_end?: string | null;
+  location?: string;
+}
+
+interface FormRow {
+  id: string;
+  title: string;
+  response_count?: number;
+}
+
+interface EventsRes {
+  success: boolean;
+  events?: EventRow[];
+}
+interface FormsRes {
+  success: boolean;
+  forms?: FormRow[];
+}
+interface ManagersRes {
+  success: boolean;
+  managers?: unknown[];
+}
+interface PrayerRes {
+  success: boolean;
+  week?: Week;
+}
+
+type LoadStatus = "loading" | "ready" | "error";
+
+function StatCard({
+  label,
+  value,
+  icon,
+  gold,
+}: {
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+  gold?: boolean;
+}) {
   return (
     <div className="stat-card">
       <div className="stat-card-left">
         <p>{label}</p>
         <span>{value}</span>
       </div>
-      <div className={`stat-icon${gold ? " stat-icon--gold" : ""}`}>
-        {icon}
-      </div>
+      <div className={`stat-icon${gold ? " stat-icon--gold" : ""}`}>{icon}</div>
     </div>
   );
+}
+
+function sydneyKey(d: Date): string {
+  return d.toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" });
+}
+
+function addDays(d: Date, days: number): Date {
+  const x = new Date(d);
+  x.setDate(x.getDate() + days);
+  return x;
+}
+
+function fmtDate(iso?: string | null): string {
+  if (!iso) return "—";
+  const parts = iso.slice(0, 10).split("-").map(Number);
+  if (parts.length !== 3 || parts.some(isNaN)) return iso;
+  return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString(
+    "en-AU",
+    { day: "numeric", month: "short", year: "numeric" }
+  );
+}
+
+async function getJson<T>(url: string): Promise<T> {
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(String(res.status));
+  return (await res.json()) as T;
 }
 
 export default function DashboardHome() {
   const [userEmail, setUserEmail] = useState("");
   const [now, setNow] = useState(new Date());
+  const [status, setStatus] = useState<LoadStatus>("loading");
+  const [events, setEvents] = useState<EventRow[] | null>(null);
+  const [forms, setForms] = useState<FormRow[] | null>(null);
+  const [managerCount, setManagerCount] = useState<number | null>(null);
+  const [week, setWeek] = useState<Week | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    async function check() {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) { router.push("/login"); return; }
-      setUserEmail(data.user.email ?? "");
-    }
-    check();
-  }, [router]);
+  const load = useCallback(async () => {
+    setStatus("loading");
+    const [ev, fm, mg, pr] = await Promise.allSettled([
+      getJson<EventsRes>("/api/events"),
+      getJson<FormsRes>("/api/forms"),
+      getJson<ManagersRes>("/api/managers"),
+      getJson<PrayerRes>("/api/prayer"),
+    ]);
+
+    setEvents(
+      ev.status === "fulfilled" && ev.value.success && Array.isArray(ev.value.events)
+        ? ev.value.events
+        : null
+    );
+    setForms(
+      fm.status === "fulfilled" && fm.value.success && Array.isArray(fm.value.forms)
+        ? fm.value.forms
+        : null
+    );
+    setManagerCount(
+      mg.status === "fulfilled" && mg.value.success && Array.isArray(mg.value.managers)
+        ? mg.value.managers.length
+        : null
+    );
+    setWeek(
+      pr.status === "fulfilled" && pr.value.success && Array.isArray(pr.value.week)
+        ? pr.value.week
+        : null
+    );
+
+    const allFailed = [ev, fm, mg, pr].every((r) => r.status === "rejected");
+    setStatus(allFailed ? "error" : "ready");
+  }, []);
 
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 60000);
+    let cancelled = false;
+    async function check() {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) {
+        router.push("/login");
+        return;
+      }
+      if (cancelled) return;
+      setUserEmail(data.user.email ?? "");
+      void load();
+    }
+    check();
+    return () => {
+      cancelled = true;
+    };
+  }, [router, load]);
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(t);
   }, []);
 
-  const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 17 ? "Good afternoon" : "Good evening";
+  const greeting =
+    now.getHours() < 12
+      ? "Good morning"
+      : now.getHours() < 17
+        ? "Good afternoon"
+        : "Good evening";
   const firstName = userEmail.split("@")[0].split(".")[0];
-  const dateStr = now.toLocaleDateString("en-AU", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const dateStr = now.toLocaleDateString("en-AU", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 
-  const prayers = [
-    { name: "Fajr", time: "5:15 AM", iqamah: "5:35 AM", pct: 30, color: "#03894a" },
-    { name: "Dhuhr", time: "12:15 PM", iqamah: "12:30 PM", pct: 60, color: "#c8a65d" },
-    { name: "Asr", time: "3:30 PM", iqamah: "3:35 PM", pct: 75, color: "#026839" },
-    { name: "Maghrib", time: "6:05 PM", iqamah: "6:10 PM", pct: 85, color: "#9c7e3d" },
-    { name: "Isha", time: "7:30 PM", iqamah: "7:50 PM", pct: 95, color: "#012a1a" },
-  ];
+  const todayKey = sydneyKey(now);
+  const tomorrowKey = sydneyKey(addDays(now, 1));
+  const byKey = (k: string) => week?.find((d) => d.dateKey === k) || null;
+  const todayDay =
+    byKey(todayKey) ||
+    (week
+      ? [...week]
+          .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+          .find((d) => d.dateKey >= todayKey) || null
+      : null);
+  const prayers = todayDay?.prayers || [];
+  const tomorrowPrayers = byKey(tomorrowKey)?.prayers || [];
 
-  const upcoming = [
-    { title: "Quran Circle", date: "Every Saturday", time: "7:00 PM", status: "active" },
-    { title: "Youth Night", date: "Every Friday", time: "7:30 PM", status: "active" },
-    { title: "Community BBQ", date: "15 Sep 2026", time: "12:00 PM", status: "upcoming" },
-  ];
+  const next =
+    prayers.length > 0 ? getNextPrayer(prayers, now, tomorrowPrayers) : null;
+  const nextTarget =
+    next && next.prayer && next.targetTime
+      ? getCountdownParts(
+          next.nextDay ? addDays(now, 1) : now,
+          next.targetTime,
+          now
+        )
+      : null;
+  const nextMeta =
+    next && next.prayer && next.prayer.name
+      ? `Next: ${next.prayer.name} · ${
+          next.phase === "iqamah" ? "Iqamah" : "Athan"
+        }${nextTarget ? ` in ${nextTarget.hours}h ${nextTarget.minutes}m` : " soon"}`
+      : null;
+
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  const pctFor = (i: number): number => {
+    const p = prayers[i];
+    const athanM = parseTimeToMins(p.athan);
+    if (athanM < 0) return 0;
+    const prev = i > 0 ? prayers[i - 1] : null;
+    let startM = 0;
+    if (prev) {
+      const iq = parseTimeToMins(prev.iqamah);
+      startM = iq >= 0 ? iq : parseTimeToMins(prev.athan);
+      if (startM < 0) startM = 0;
+    }
+    if (nowMins <= startM) return 0;
+    if (athanM <= startM || nowMins >= athanM) return 100;
+    return Math.round(((nowMins - startM) / (athanM - startM)) * 100);
+  };
+  const activeKey = next?.prayer?.key;
+
+  const upcoming = (events || [])
+    .filter((e) => e.date_start >= todayKey)
+    .sort((a, b) => a.date_start.localeCompare(b.date_start));
+  const upcomingCount = upcoming.length;
+  const formCount = forms ? forms.length : null;
+  const responseCount = forms
+    ? forms.reduce((sum, f) => sum + (f.response_count || 0), 0)
+    : null;
+
+  const num = (n: number | null): string | number =>
+    status === "loading" ? "–" : n === null ? "–" : n;
 
   if (!userEmail) return null;
+
+  const loading = status === "loading";
 
   return (
     <div>
       <div className="page-header">
         <div className="page-eyebrow">Overview</div>
-        <h1>{greeting}, {firstName || "Admin"}</h1>
-        <p>{dateStr} &mdash; Here&apos;s what&apos;s happening at Masjid As Sunnah.</p>
+        <h1>
+          {greeting}, {firstName || "Admin"}
+        </h1>
+        <p>
+          {dateStr} &mdash; Here&apos;s what&apos;s happening at Masjid As Sunnah.
+        </p>
       </div>
 
+      {status === "error" && (
+        <div className="dash-error" role="alert">
+          <span>Couldn&apos;t load dashboard data. Check your connection and try again.</span>
+          <button type="button" onClick={load}>
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="stats-row">
-        <StatCard label="Prayer Times" value="5"
-          icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>} />
-        <StatCard label="Upcoming Events" value="3" gold
-          icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>} />
-        <StatCard label="Forms" value="4"
-          icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>} />
-        <StatCard label="Managers" value="1" gold
-          icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>} />
-        <StatCard label="Active Users" value="1"
-          icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>} />
+        <StatCard
+          label="Prayer Times"
+          value={num(prayers.length || null)}
+          icon={
+            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          }
+        />
+        <StatCard
+          label="Upcoming Events"
+          value={num(events ? upcomingCount : null)}
+          gold
+          icon={
+            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          }
+        />
+        <StatCard
+          label="Forms"
+          value={num(formCount)}
+          icon={
+            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
+          }
+        />
+        <StatCard
+          label="Responses"
+          value={num(responseCount)}
+          gold
+          icon={
+            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg>
+          }
+        />
+        <StatCard
+          label="Managers"
+          value={num(managerCount)}
+          icon={
+            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+          }
+        />
       </div>
 
       <div className="two-col">
@@ -84,16 +304,46 @@ export default function DashboardHome() {
           <div className="panel-title">
             <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
             Prayer Schedule
+            {nextMeta && <span className="panel-title-meta">{nextMeta}</span>}
           </div>
-          {prayers.map((p) => (
-            <div className="schedule-row" key={p.name}>
-              <span className="schedule-name">{p.name}</span>
-              <div className="schedule-bar">
-                <div className="schedule-bar-fill" style={{ width: `${p.pct}%`, background: p.color }} />
-              </div>
-              <span className="schedule-time">{p.iqamah}</span>
+          {loading ? (
+            <div className="panel-center">
+              <div className="spinner" />
             </div>
-          ))}
+          ) : prayers.length === 0 ? (
+            <p className="panel-empty">
+              Prayer times unavailable right now.{" "}
+              <button
+                type="button"
+                className="panel-empty-link"
+                onClick={load}
+              >
+                Retry
+              </button>
+            </p>
+          ) : (
+            prayers.map((p, i) => (
+              <div
+                className={`schedule-row${p.key === activeKey ? " schedule-row--active" : ""}`}
+                key={p.key}
+              >
+                <span className="schedule-name">{p.name}</span>
+                <div className="schedule-bar">
+                  <div
+                    className="schedule-bar-fill"
+                    style={{
+                      width: `${pctFor(i)}%`,
+                      background:
+                        p.key === activeKey
+                          ? "var(--color-gold)"
+                          : "var(--color-primary)",
+                    }}
+                  />
+                </div>
+                <span className="schedule-time">{p.iqamah}</span>
+              </div>
+            ))
+          )}
         </div>
 
         <div className="panel">
@@ -101,18 +351,55 @@ export default function DashboardHome() {
             <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
             Upcoming Events
           </div>
-          {upcoming.map((e, i) => (
-            <div className="list-item" key={i}>
-              <div className="list-rank" style={e.status === "active" ? undefined : { background: "var(--color-gold-soft)", color: "var(--color-gold-deep)" }}>
-                {i + 1}
-              </div>
-              <div className="list-info">
-                <p className="list-name">{e.title}</p>
-                <p className="list-detail">{e.date} &middot; {e.time}</p>
-              </div>
-              <span className={`badge${e.status === "active" ? "" : " badge--gold"}`}>{e.status}</span>
+          {loading ? (
+            <div className="panel-center">
+              <div className="spinner" />
             </div>
-          ))}
+          ) : upcoming.length === 0 ? (
+            <p className="panel-empty">
+              No upcoming events.{" "}
+              <Link href="/dashboard/events">Create one &rarr;</Link>
+            </p>
+          ) : (
+            upcoming.slice(0, 4).map((e, i) => (
+              <Link
+                key={e.id}
+                href={`/dashboard/events/${e.id}`}
+                style={{ textDecoration: "none", color: "inherit" }}
+              >
+                <div className="list-item">
+                  <div
+                    className="list-rank"
+                    style={
+                      e.status === "published"
+                        ? undefined
+                        : { background: "var(--color-gold-soft)", color: "var(--color-gold-deep)" }
+                    }
+                  >
+                    {i + 1}
+                  </div>
+                  <div className="list-info">
+                    <p className="list-name">{e.title}</p>
+                    <p className="list-detail">
+                      {fmtDate(e.date_start)}
+                      {e.location ? ` · ${e.location}` : ""}
+                    </p>
+                  </div>
+                  <span
+                    className={`badge${
+                      e.status === "published"
+                        ? ""
+                        : e.status === "draft"
+                          ? " badge--gold"
+                          : " badge--muted"
+                    }`}
+                  >
+                    {e.status}
+                  </span>
+                </div>
+              </Link>
+            ))
+          )}
         </div>
       </div>
 
@@ -149,7 +436,7 @@ export default function DashboardHome() {
       </div>
 
       <div className="active-header">
-        <h2>Active Events</h2>
+        <h2>All Events</h2>
         <Link href="/dashboard/events" style={{ textDecoration: "none" }}>
           <button className="btn-primary">New Event</button>
         </Link>
@@ -158,17 +445,47 @@ export default function DashboardHome() {
         <div className="active-table-header">
           <span>Event</span>
           <span>Date</span>
-          <span>Time</span>
+          <span>Location</span>
           <span>Status</span>
         </div>
-        {upcoming.map((e, i) => (
-          <div className="active-table-row" key={i}>
-            <span style={{ fontWeight: 500 }}>{e.title}</span>
-            <span style={{ color: "var(--text-secondary)" }}>{e.date}</span>
-            <span style={{ color: "var(--text-secondary)" }}>{e.time}</span>
-            <span className="badge">{e.status}</span>
+        {loading ? (
+          <div className="panel-center">
+            <div className="spinner" />
           </div>
-        ))}
+        ) : !events || events.length === 0 ? (
+          <p className="panel-empty" style={{ padding: "18px 24px" }}>
+            No events yet.{" "}
+            <Link href="/dashboard/events">Create the first one &rarr;</Link>
+          </p>
+        ) : (
+          events.slice(0, 6).map((e) => (
+            <Link
+              key={e.id}
+              href={`/dashboard/events/${e.id}`}
+              className="active-table-row"
+              style={{ textDecoration: "none", color: "inherit" }}
+            >
+              <span style={{ fontWeight: 500 }}>{e.title}</span>
+              <span style={{ color: "var(--text-secondary)" }}>
+                {fmtDate(e.date_start)}
+              </span>
+              <span style={{ color: "var(--text-secondary)" }}>
+                {e.location || "—"}
+              </span>
+              <span
+                className={`badge${
+                  e.status === "published"
+                    ? ""
+                    : e.status === "draft"
+                      ? " badge--gold"
+                      : " badge--muted"
+                }`}
+              >
+                {e.status}
+              </span>
+            </Link>
+          ))
+        )}
       </div>
     </div>
   );

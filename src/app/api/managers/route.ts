@@ -99,7 +99,14 @@ async function sendInvite(email: string, invitedBy: string) {
     options: { redirectTo: `${appUrl}/invite-login`, data: { invited_by: invitedBy } },
   });
   if (error) return { link: null as string | null, mailError: error.message };
-  const link = (data as unknown as { properties?: { action_link?: string } } | null)?.properties?.action_link ?? null;
+  const props = (data as unknown as { properties?: { action_link?: string; hashed_token?: string } } | null)?.properties;
+  // invite-login consumes our own ?token_hash= link via verifyOtp(). The raw
+  // action_link uses an implicit-grant redirect (#access_token=...), which the
+  // @supabase/ssr browser client (flowType forced to "pkce") refuses to parse,
+  // so the session would never be established.
+  const link = props?.hashed_token
+    ? `${appUrl}/invite-login?token_hash=${encodeURIComponent(props.hashed_token)}&type=invite`
+    : (props?.action_link ?? null);
   return { link, mailError: null };
 }
 
