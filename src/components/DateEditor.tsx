@@ -8,6 +8,7 @@ import {
   Clock,
   Repeat,
 } from "@phosphor-icons/react";
+import { recurringLabel } from "@/lib/dateLabels";
 
 const DATE_TYPES = [
   { value: "single", label: "Single Date" },
@@ -93,24 +94,17 @@ export default function DateEditor({ dates, onChange }: DateEditorProps) {
     return "";
   }, []);
 
-  const buildRecurringPattern = useCallback((entry: DateEntry): string | null => {
-    if (entry.date_type !== "recurring") return null;
-    const dayName = entry.date_start
-      ? new Date(entry.date_start + "T12:00:00").toLocaleDateString("en-AU", { weekday: "long" })
-      : "";
-    if (entry.recurring_pattern === "daily") return "Daily";
-    if (entry.recurring_pattern === "weekly") return `Every ${dayName}`;
-    if (entry.recurring_pattern === "monthly") return "Monthly";
-    if (entry.recurring_pattern === "yearly") return "Yearly";
-    if (entry.recurring_pattern === "custom" && entry.weekdays?.length) {
-      return `Every ${entry.weekdays.join(", ")}`;
-    }
-    return entry.recurring_pattern;
-  }, []);
-
   const handleAddSingle = useCallback(() => {
     if (!draft.date_start) return;
-    const entry = { ...draft, date_type: mode, recurring_pattern: buildRecurringPattern(draft), display: "" };
+    const pattern =
+      mode === "recurring" ? draft.recurring_pattern || recurringType : null;
+    const entry: DateEntry = {
+      ...draft,
+      date_type: mode,
+      recurring_pattern: pattern,
+      weekdays: pattern === "custom" ? draft.weekdays : null,
+      display: "",
+    };
     entry.display = buildDisplay(entry);
     if (mode === "multi") {
       setMultiDates((prev) => [...prev, entry]);
@@ -119,7 +113,7 @@ export default function DateEditor({ dates, onChange }: DateEditorProps) {
       onChange([...dates, entry]);
       setDraft({ ...EMPTY_SINGLE });
     }
-  }, [draft, mode, dates, onChange, buildDisplay, buildRecurringPattern]);
+  }, [draft, mode, recurringType, dates, onChange, buildDisplay]);
 
   const handleAddMultiBatch = useCallback(() => {
     if (multiDates.length === 0) return;
@@ -144,7 +138,14 @@ export default function DateEditor({ dates, onChange }: DateEditorProps) {
         {DATE_TYPES.map((dt) => (
           <button
             key={dt.value}
-            onClick={() => { setMode(dt.value); setDraft({ ...EMPTY_SINGLE }); }}
+            onClick={() => {
+              setMode(dt.value);
+              setDraft({
+                ...EMPTY_SINGLE,
+                date_type: dt.value,
+                recurring_pattern: dt.value === "recurring" ? recurringType : null,
+              });
+            }}
             style={{
               padding: "7px 14px", borderRadius: 9999,
               border: `1px solid ${mode === dt.value ? "var(--color-primary)" : "var(--color-border)"}`,
@@ -497,7 +498,7 @@ export default function DateEditor({ dates, onChange }: DateEditorProps) {
                 <div style={{ fontSize: 14, color: "var(--color-ink)", fontWeight: 600 }}>{d.display}</div>
                 <div style={{ fontSize: 12, color: "var(--color-muted)", marginTop: 2 }}>
                   {d.date_start}{d.date_end ? ` – ${d.date_end}` : ""}
-                  {d.recurring_pattern ? ` · ${d.recurring_pattern}` : ""}
+                  {recurringLabel(d) ? ` · ${recurringLabel(d)}` : ""}
                   {d.all_day ? " · All Day" : ""}
                   {d.after_prayer ? ` · ${d.after_prayer}` : ""}
                   {d.time_start ? ` · ${d.time_start}${d.time_end ? ` – ${d.time_end}` : ""}` : ""}

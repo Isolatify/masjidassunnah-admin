@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/Toast";
+import { recurringLabel } from "@/lib/dateLabels";
 import {
   Plus,
   CalendarBlank,
@@ -30,7 +31,13 @@ interface EventItem {
   recurring_pattern: string | null;
   location: string;
   audience: string[];
-  dates_json: { display: string }[];
+  dates_json: {
+    display: string;
+    date_start?: string | null;
+    date_type?: string | null;
+    recurring_pattern?: string | null;
+    weekdays?: string[] | null;
+  }[];
   status: string;
   created_at: string;
 }
@@ -54,10 +61,19 @@ function formatDate(dateStr: string): string {
 }
 
 function formatDisplayDate(ev: EventItem): string {
-  if (ev.dates_json?.length && ev.dates_json[0].display) {
-    return ev.dates_json[0].display;
+  const first = ev.dates_json?.[0];
+  if (first?.display) {
+    const label = recurringLabel(first);
+    return label ? `${first.display} · ${label}` : first.display;
   }
-  if (ev.recurring_pattern) return ev.recurring_pattern;
+  if (ev.recurring_pattern || ev.date_type === "recurring") {
+    const label = recurringLabel({
+      date_start: ev.date_start,
+      date_type: ev.date_type,
+      recurring_pattern: ev.recurring_pattern,
+    });
+    if (label) return label;
+  }
   if (ev.date_end && ev.date_end !== ev.date_start) {
     return `${formatDate(ev.date_start)} – ${formatDate(ev.date_end)}`;
   }

@@ -27,6 +27,8 @@ import RichTextEditor from "@/components/RichTextEditor";
 import DateEditor from "@/components/DateEditor";
 import type { DateEntry } from "@/components/DateEditor";
 import { type FormRecord } from "@/lib/forms";
+import { deriveDateFields } from "@/lib/eventDates";
+import { SITE_URL } from "@/lib/siteUrl";
 
 const AUDIENCE_OPTIONS = ["All", "Brothers", "Sisters", "Youth", "Children"] as const;
 
@@ -90,6 +92,7 @@ interface EventData {
   dates_json: DateEntry[];
   links: LinkEntry[];
   persons: PersonEntry[];
+  faq?: { question: string; answer: string }[] | null;
   cost: string;
   form_id: string | null;
   register_url: string;
@@ -487,12 +490,15 @@ export default function EventEditorPage({ params }: { params: Promise<{ id: stri
       setSaving(true);
       try {
         const nextStatus = status || event.status || "draft";
+        const dates = event.dates_json || [];
         const payload = {
           ...(isNew ? {} : { id }),
           ...event,
+          // Keep legacy top-level columns in step with dates_json on every save.
+          ...(dates.length ? deriveDateFields(dates) : {}),
           status: nextStatus,
-          dates_json: event.dates_json || [],
-          faq: [],
+          dates_json: dates,
+          faq: event.faq || [],
           audience: event.audience || [],
           links: event.links || [],
           persons: event.persons || [],
@@ -591,7 +597,12 @@ export default function EventEditorPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  const nextDate = event.dates_json?.[0]?.date_start;
+  const derived = deriveDateFields(event.dates_json || []);
+  const nextDate =
+    derived.date_start ||
+    event.dates_json?.[0]?.date_start ||
+    event.date_start ||
+    null;
   const untilPhrase = untilPhraseFor(nextDate);
   const heroImage = event.cover_image || event.full_image;
 
@@ -805,7 +816,9 @@ export default function EventEditorPage({ params }: { params: Promise<{ id: stri
             </div>
             <DateEditor
               dates={event.dates_json || []}
-              onChange={(dates) => update({ dates_json: dates })}
+              onChange={(dates) =>
+                update({ ...deriveDateFields(dates), dates_json: dates })
+              }
             />
           </section>
 
@@ -1072,7 +1085,7 @@ export default function EventEditorPage({ params }: { params: Promise<{ id: stri
             {!isNew && event.slug && (
               <a
                 className="ev-view"
-                href={`/events/${event.slug}`}
+                href={`${SITE_URL}/events/${event.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
               >

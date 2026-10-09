@@ -4,6 +4,7 @@ import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import FormRenderer from "@/components/forms/FormRenderer";
 import type { FormRecord } from "@/lib/forms";
+import { SITE_URL } from "@/lib/siteUrl";
 
 export default function PublicFormPage({
   params,
@@ -62,7 +63,7 @@ export default function PublicFormPage({
           <span className="jff-missing-art">404</span>
           <h1 className="jff-title">Form not found</h1>
           <p className="jff-desc">This link may have been removed or mistyped.</p>
-          <Link className="jff-submit" href="/">
+          <Link className="jff-submit" href={SITE_URL}>
             Go to website
           </Link>
         </div>
