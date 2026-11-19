@@ -40,10 +40,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div style={{ minHeight: "100vh" }}>
+    <div className="app-shell">
       <Sidebar />
-      <div className="main-content">
-        <AccessGate>{children}</AccessGate>
+      <div className="app-main">
+        <main className="main-content">
+          <AccessGate>{children}</AccessGate>
+        </main>
       </div>
       <ToastContainer />
     </div>

@@ -1,138 +1,115 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+/* ==========================================================================
+   Events — the programme list.
+     · header: eyebrow / title / sub, with Overview + New Event
+     · search + status chips + sortable table (responses link into
+       /dashboard/responses)
+     · row click opens the editor; publish / delete live in the row
+   The glance half of this section — stats, spotlight, 30-day trend — is
+   /dashboard/events/overview.
+   ========================================================================== */
+
+import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/Toast";
-import { recurringLabel } from "@/lib/dateLabels";
 import {
   Plus,
   CalendarBlank,
-  MapPin,
+  MagnifyingGlass,
+  Trash,
+  PencilSimple,
   Eye,
   EyeSlash,
-  UsersThree,
-  MagnifyingGlass,
-  CaretLeft,
-  CaretRight,
-  Trash,
 } from "@phosphor-icons/react";
+import s from "./page.module.css";
+import {
+  audienceLabel,
+  decorate,
+  emptyState,
+  getDisplayDate,
+  useOverview,
+  type Decorated,
+  type EventItem,
+} from "./shared";
 
-interface EventItem {
-  id: string;
-  title: string;
-  slug: string;
-  description: string;
-  content_html: string;
-  cover_image: string;
-  image_url: string;
-  date_start: string;
-  date_end: string | null;
-  date_type: string;
-  recurring_pattern: string | null;
-  location: string;
-  audience: string[];
-  dates_json: {
-    display: string;
-    date_start?: string | null;
-    date_type?: string | null;
-    recurring_pattern?: string | null;
-    weekdays?: string[] | null;
-  }[];
-  status: string;
-  created_at: string;
-}
+type StatusFilter = "all" | "published" | "draft";
+type SortKey = "title" | "date" | "created" | "status" | "responses" | "views";
 
-const INPUT: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 14px",
-  borderRadius: 12,
-  border: "1px solid var(--color-border)",
-  background: "var(--color-surface)",
-  color: "var(--color-ink)",
-  fontSize: 14,
-  fontFamily: "inherit",
-  outline: "none",
-};
+const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "published", label: "Published" },
+  { id: "draft", label: "Drafts" },
+];
 
-function formatDate(dateStr: string): string {
-  if (!dateStr) return "";
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
-}
+/* ── Page ────────────────────────────────────────────────────────────────── */
 
-function formatDisplayDate(ev: EventItem): string {
-  const first = ev.dates_json?.[0];
-  if (first?.display) {
-    const label = recurringLabel(first);
-    return label ? `${first.display} · ${label}` : first.display;
-  }
-  if (ev.recurring_pattern || ev.date_type === "recurring") {
-    const label = recurringLabel({
-      date_start: ev.date_start,
-      date_type: ev.date_type,
-      recurring_pattern: ev.recurring_pattern,
-    });
-    if (label) return label;
-  }
-  if (ev.date_end && ev.date_end !== ev.date_start) {
-    return `${formatDate(ev.date_start)} – ${formatDate(ev.date_end)}`;
-  }
-  return formatDate(ev.date_start);
-}
-
-function getEventDateForSort(ev: EventItem): Date {
-  return new Date(ev.date_start + "T00:00:00");
-}
-
-function getAudienceLabel(audience: string[]): string {
-  if (!audience?.length) return "";
-  if (audience.includes("All")) return "Open to all";
-  return audience.join(", ");
-}
-
-export default function EventsPage() {
+export default function EventsListPage() {
   const router = useRouter();
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [sortBy, setSortBy] = useState<"date-new" | "date-old" | "title-az" | "title-za" | "status">("date-new");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const { overview, loadError, load, loading } = useOverview();
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "date", dir: 1 });
+  const [deleteConfirm, setDeleteConfirm] = useState<Decorated | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  const fetchEvents = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/events");
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
-      setEvents(data.events || []);
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to load events");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const events = useMemo(() => (overview?.events ?? []).map(decorate), [overview]);
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const res = await fetch("/api/events");
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error);
-        if (alive) setEvents(data.events || []);
-      } catch (err: unknown) {
-        if (alive) toast.error(err instanceof Error ? err.message : "Failed to load events");
-      } finally {
-        if (alive) setLoading(false);
+  /* ── Table: filter + sort ── */
+  const rows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const filtered = events.filter((ev) => {
+      if (statusFilter !== "all" && ev.status !== statusFilter) return false;
+      if (!q) return true;
+      return (
+        (ev.title || "").toLowerCase().includes(q) ||
+        (ev.description || "").toLowerCase().includes(q) ||
+        (ev.location || "").toLowerCase().includes(q)
+      );
+    });
+
+    const respCount = (ev: EventItem) =>
+      ev.form_id ? (overview?.formCounts?.[ev.form_id] ?? 0) : null;
+
+    const dir = sort.dir;
+    return filtered.sort((a, b) => {
+      switch (sort.key) {
+        case "title":
+          return (a.title || "").localeCompare(b.title || "") * dir;
+        case "created":
+          return String(a.created_at).localeCompare(String(b.created_at)) * dir;
+        case "status":
+          return a.status.localeCompare(b.status) * dir;
+        case "responses":
+          return ((respCount(a) ?? -1) - (respCount(b) ?? -1)) * dir;
+        case "views":
+          return ((a.view_count || 0) - (b.view_count || 0)) * dir;
+        case "date":
+        default: {
+          /* Undated rows always sink to the bottom, whichever way it sorts. */
+          if (a.__next === null && b.__next === null)
+            return String(a.date_start).localeCompare(String(b.date_start)) * dir;
+          if (a.__next === null) return 1;
+          if (b.__next === null) return -1;
+          return (a.__next - b.__next) * dir;
+        }
       }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
+    });
+  }, [events, search, statusFilter, sort, overview]);
 
+  function headSort(key: SortKey) {
+    setSort((prev) =>
+      prev.key === key
+        ? { key, dir: (prev.dir === 1 ? -1 : 1) as 1 | -1 }
+        : { key, dir: key === "date" || key === "title" ? 1 : -1 }
+    );
+  }
+
+  const respCount = (ev: EventItem) =>
+    ev.form_id ? (overview?.formCounts?.[ev.form_id] ?? 0) : null;
+
+  /* ── Actions ── */
   async function handleDelete(id: string) {
     try {
       const res = await fetch("/api/events", {
@@ -144,327 +121,310 @@ export default function EventsPage() {
       if (!data.success) throw new Error(data.error);
       toast.success("Event deleted");
       setDeleteConfirm(null);
-      fetchEvents();
+      load();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to delete");
     }
   }
 
-  function sortEvents(list: EventItem[]): EventItem[] {
-    const sorted = [...list];
-    switch (sortBy) {
-      case "date-new":
-        return sorted.sort((a, b) => getEventDateForSort(b).getTime() - getEventDateForSort(a).getTime());
-      case "date-old":
-        return sorted.sort((a, b) => getEventDateForSort(a).getTime() - getEventDateForSort(b).getTime());
-      case "title-az":
-        return sorted.sort((a, b) => a.title.localeCompare(b.title));
-      case "title-za":
-        return sorted.sort((a, b) => b.title.localeCompare(a.title));
-      case "status":
-        return sorted.sort((a, b) => (a.status === "published" ? -1 : 1) - (b.status === "published" ? -1 : 1));
-      default:
-        return sorted;
+  async function toggleStatus(ev: EventItem) {
+    const next = ev.status === "published" ? "draft" : "published";
+    setTogglingId(ev.id);
+    try {
+      const res = await fetch("/api/events", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: ev.id, status: next }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      toast.success(next === "published" ? "Event published" : "Event moved to drafts");
+      load();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Could not change status");
+    } finally {
+      setTogglingId(null);
     }
   }
-
-  function filterEvents(list: EventItem[]): EventItem[] {
-    let filtered = list;
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((e) => e.status === statusFilter);
-    }
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (e) =>
-          e.title.toLowerCase().includes(q) ||
-          (e.description || "").toLowerCase().includes(q) ||
-          (e.location || "").toLowerCase().includes(q) ||
-          getAudienceLabel(e.audience).toLowerCase().includes(q)
-      );
-    }
-    return filtered;
-  }
-
-  const displayed = sortEvents(filterEvents(events));
-  const publishedCount = events.filter((e) => e.status === "published").length;
-  const draftCount = events.filter((e) => e.status === "draft").length;
 
   return (
     <div>
-      {/* Header */}
-      <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div>
-          <div className="page-eyebrow">Content</div>
-          <h1>Events</h1>
-          <p>Manage masjid events and programmes.</p>
+      {/* ── Header ── */}
+      <header className={s.head}>
+        <div className="page-header" style={{ marginBottom: 0 }}>
+          <div className="page-eyebrow">Events</div>
+          <h1>Every programme, in one place.</h1>
+          <p>Search, publish and manage them all — click any row to open its editor.</p>
         </div>
-        <button
-          className="btn-primary"
-          onClick={() => router.push("/dashboard/events/new")}
-          style={{ display: "flex", alignItems: "center", gap: 6 }}
-        >
-          <Plus size={16} weight="bold" /> New Event
-        </button>
-      </div>
-
-      {/* Status tabs */}
-      <div className="tabs" style={{ marginBottom: 20 }}>
-        {(["all", "published", "draft"] as const).map((s) => (
+        <div className={s.headActions}>
+          <Link className="btn btn-secondary" href="/dashboard/events/overview">
+            Overview
+          </Link>
           <button
-            key={s}
-            onClick={() => setStatusFilter(s)}
-            className={`tab ${statusFilter === s ? "active" : ""}`}
+            type="button"
+            className="btn-primary"
+            onClick={() => router.push("/dashboard/events/new")}
           >
-            {s === "all" ? `All (${events.length})` : s === "published" ? `Published (${publishedCount})` : `Draft (${draftCount})`}
+            <Plus size={16} weight="bold" /> New Event
           </button>
-        ))}
-      </div>
-
-      {/* Toolbar */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 24, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--color-surface)", borderRadius: 12, border: "1px solid var(--color-border)", padding: "0 12px" }}>
-          <MagnifyingGlass size={16} color="var(--color-muted)" />
-          <input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search events..."
-            style={{ ...INPUT, width: 240, border: "none", background: "transparent", margin: 0, padding: "10px 0" }}
-          />
         </div>
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          style={{ ...INPUT, width: 180, margin: 0, cursor: "pointer" }}
-        >
-          <option value="date-new">Newest first</option>
-          <option value="date-old">Oldest first</option>
-          <option value="title-az">Title A–Z</option>
-          <option value="title-za">Title Z–A</option>
-          <option value="status">By status</option>
-        </select>
-        <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
-          {(["grid", "list"] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              style={{
-                padding: "8px 12px", borderRadius: 8,
-                border: "1px solid var(--color-border)",
-                background: viewMode === mode ? "var(--color-primary)" : "transparent",
-                color: viewMode === mode ? "#fff" : "var(--color-secondary)",
-                cursor: "pointer", fontSize: 16, fontFamily: "inherit", transition: "all 0.15s",
-              }}
-            >
-              {mode === "grid" ? "▦" : "☰"}
-            </button>
-          ))}
-        </div>
-      </div>
+      </header>
 
-      {/* Content */}
       {loading ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
+        <div style={{ display: "flex", justifyContent: "center", padding: 70 }}>
           <div className="spinner" />
         </div>
-      ) : displayed.length === 0 ? (
-        <div style={{
-          textAlign: "center", padding: 60, borderRadius: 16,
-          border: "2px dashed var(--color-border)", color: "var(--color-muted)", fontSize: 15,
-        }}>
-          {searchQuery || statusFilter !== "all" ? "No events match your filters." : "No events yet. Create your first one!"}
-        </div>
-      ) : viewMode === "grid" ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 20 }}>
-          {displayed.map((ev) => (
-            <div
-              key={ev.id}
-              onClick={() => router.push(`/dashboard/events/${ev.id}`)}
-              style={{
-                background: "var(--color-surface)", border: "1px solid var(--color-border-soft)",
-                borderRadius: 18, overflow: "hidden", boxShadow: "var(--shadow-sm)",
-                transition: "all 0.2s", cursor: "pointer",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--color-surface)";
-                e.currentTarget.style.borderColor = "var(--color-border)";
-                e.currentTarget.style.transform = "translateY(-3px)";
-                e.currentTarget.style.boxShadow = "var(--shadow-md)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "var(--color-surface)";
-                e.currentTarget.style.borderColor = "var(--color-border-soft)";
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "var(--shadow-sm)";
-              }}
-            >
-              {/* Image */}
-              {ev.cover_image || ev.image_url ? (
-                <div style={{ width: "100%", height: 180, overflow: "hidden", position: "relative" }}>
-                  <img src={ev.cover_image || ev.image_url} alt={ev.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  <div style={{
-                    position: "absolute", top: 10, right: 10,
-                    padding: "4px 10px", borderRadius: 6,
-                    background: ev.status === "published" ? "#026839" : "rgba(10,10,10,0.55)",
-                    backdropFilter: "blur(4px)", fontSize: 11, fontWeight: 600,
-                    color: "white", display: "flex", alignItems: "center", gap: 4,
-                  }}>
-                    {ev.status === "published" ? <Eye size={11} /> : <EyeSlash size={11} />}
-                    {ev.status}
-                  </div>
-                </div>
-              ) : (
-                <div style={{
-                  width: "100%", height: 120,
-                  background: "linear-gradient(135deg, #04a24d, #014d2b)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  position: "relative",
-                }}>
-                  <CalendarBlank size={32} weight="duotone" color="rgba(255,255,255,0.5)" />
-                  <div style={{
-                    position: "absolute", top: 10, right: 10,
-                    padding: "4px 10px", borderRadius: 6,
-                    background: ev.status === "published" ? "#026839" : "rgba(10,10,10,0.55)",
-                    fontSize: 11, fontWeight: 600, color: "white",
-                    display: "flex", alignItems: "center", gap: 4,
-                  }}>
-                    {ev.status === "published" ? <Eye size={11} /> : <EyeSlash size={11} />}
-                    {ev.status}
-                  </div>
-                </div>
-              )}
-
-              {/* Body */}
-              <div style={{ padding: "16px 20px" }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "var(--color-ink)", marginBottom: 6 }}>
-                  {ev.title}
-                </div>
-                <div style={{ fontSize: 13, color: "var(--color-secondary-light)", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
-                  <CalendarBlank size={13} weight="duotone" /> {formatDisplayDate(ev)}
-                </div>
-                {ev.location && (
-                  <div style={{ fontSize: 12, color: "var(--color-muted)", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
-                    <MapPin size={12} weight="duotone" /> {ev.location.length > 40 ? ev.location.slice(0, 40) + "..." : ev.location}
-                  </div>
-                )}
-                {ev.audience?.length > 0 && (
-                  <div style={{ fontSize: 11, color: "var(--color-muted)", display: "flex", alignItems: "center", gap: 4, marginBottom: 8 }}>
-                    <UsersThree size={12} weight="duotone" /> {getAudienceLabel(ev.audience)}
-                  </div>
-                )}
-                {ev.description && (
-                  <div style={{
-                    fontSize: 12, color: "var(--color-muted)", lineHeight: 1.4,
-                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
-                  }}>
-                    {ev.description}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+      ) : loadError ? (
+        <div className="panel">
+          {emptyState(
+            `Couldn't load events — ${loadError}`,
+            <button type="button" className="btn btn-secondary" onClick={load}>
+              Try again
+            </button>
+          )}
         </div>
       ) : (
-        <div style={{
-          background: "var(--color-surface)", borderRadius: 18,
-          border: "1px solid var(--color-border-soft)", overflow: "hidden", boxShadow: "var(--shadow-sm)",
-        }}>
-          {/* Table header */}
-          <div style={{
-            display: "grid", gridTemplateColumns: "50px 2fr 1.5fr 1fr 100px 80px",
-            padding: "12px 20px", borderBottom: "1px solid var(--color-border-soft)",
-            fontSize: 11, fontWeight: 600, color: "var(--color-muted)",
-            textTransform: "uppercase", letterSpacing: "0.06em",
-          }}>
-            <span></span><span>Event</span><span>Date</span><span>Location</span><span>Audience</span><span></span>
+        <div className="panel">
+          <div className="panel-title">
+            <CalendarBlank size={15} /> All events
+            <span className={s.count}>{rows.length}</span>
           </div>
-          {displayed.map((ev) => (
-            <div
-              key={ev.id}
-              onClick={() => router.push(`/dashboard/events/${ev.id}`)}
-              style={{
-                display: "grid", gridTemplateColumns: "50px 2fr 1.5fr 1fr 100px 80px",
-                padding: "14px 20px", alignItems: "center",
-                borderBottom: "1px solid var(--color-border-soft)",
-                cursor: "pointer", transition: "background 0.15s",
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = "var(--color-bg)"}
-              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-            >
-              <div>
-                {ev.cover_image || ev.image_url ? (
-                  <img src={ev.cover_image || ev.image_url} alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover" }} />
-                ) : (
-                  <div style={{
-                    width: 36, height: 36, borderRadius: 8,
-                    background: "linear-gradient(135deg, #04a24d, #014d2b)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>
-                    <CalendarBlank size={16} weight="duotone" color="rgba(255,255,255,0.6)" />
-                  </div>
-                )}
-              </div>
-              <div>
-                <div style={{ fontWeight: 600, color: "var(--color-ink)", fontSize: 14 }}>{ev.title}</div>
-                <div style={{ fontSize: 11, color: "var(--color-muted)", display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                  {ev.status === "published" ? <Eye size={10} /> : <EyeSlash size={10} />}
-                  {ev.status}
-                </div>
-              </div>
-              <span style={{ color: "var(--color-secondary-light)", fontSize: 13 }}>{formatDisplayDate(ev)}</span>
-              <span style={{ color: "var(--color-muted)", fontSize: 13 }}>{ev.location ? (ev.location.length > 25 ? ev.location.slice(0, 25) + "..." : ev.location) : "—"}</span>
-              <span style={{ color: "var(--color-muted)", fontSize: 12 }}>{getAudienceLabel(ev.audience) || "—"}</span>
-              <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+
+          <div className="fm-toolbar">
+            <label className="fm-search">
+              <MagnifyingGlass size={16} />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search events…"
+                aria-label="Search events"
+              />
+            </label>
+            <div className="fm-filters">
+              {STATUS_FILTERS.map((f) => (
                 <button
-                  onClick={(e) => { e.stopPropagation(); setDeleteConfirm(ev.id); }}
-                  style={{
-                    background: "none", border: "none", color: "#dc2626",
-                    cursor: "pointer", padding: 6,
-                  }}
+                  key={f.id}
+                  type="button"
+                  className={`fm-filter${statusFilter === f.id ? " on" : ""}`}
+                  onClick={() => setStatusFilter(f.id)}
                 >
-                  <Trash size={14} />
+                  {f.label}
                 </button>
-              </div>
+              ))}
             </div>
-          ))}
+          </div>
+
+          {events.length === 0 ? (
+            emptyState(
+              "No events yet — every programme you create shows up here.",
+              <button
+                type="button"
+                className="btn btn-gold"
+                onClick={() => router.push("/dashboard/events/new")}
+              >
+                <Plus size={15} weight="bold" /> New Event
+              </button>
+            )
+          ) : rows.length === 0 ? (
+            emptyState(
+              "No events match your search.",
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("all");
+                }}
+              >
+                Clear filters
+              </button>
+            )
+          ) : (
+            <table className="rsp-table">
+              <thead>
+                <tr>
+                  <th
+                    className={sort.key === "title" ? "sorted" : undefined}
+                    onClick={() => headSort("title")}
+                  >
+                    <span>
+                      Event
+                      {sort.key === "title" && (
+                        <i className={s.arrow}>{sort.dir === 1 ? "▲" : "▼"}</i>
+                      )}
+                    </span>
+                  </th>
+                  <th
+                    className={sort.key === "date" ? "sorted" : undefined}
+                    onClick={() => headSort("date")}
+                  >
+                    <span>
+                      Date
+                      {sort.key === "date" && (
+                        <i className={s.arrow}>{sort.dir === 1 ? "▲" : "▼"}</i>
+                      )}
+                    </span>
+                  </th>
+                  <th
+                    className={sort.key === "status" ? "sorted" : undefined}
+                    onClick={() => headSort("status")}
+                  >
+                    <span>
+                      Status
+                      {sort.key === "status" && (
+                        <i className={s.arrow}>{sort.dir === 1 ? "▲" : "▼"}</i>
+                      )}
+                    </span>
+                  </th>
+                  <th
+                    className={sort.key === "responses" ? "sorted" : undefined}
+                    onClick={() => headSort("responses")}
+                  >
+                    <span>
+                      Responses
+                      {sort.key === "responses" && (
+                        <i className={s.arrow}>{sort.dir === 1 ? "▲" : "▼"}</i>
+                      )}
+                    </span>
+                  </th>
+                  <th
+                    className={sort.key === "views" ? "sorted" : undefined}
+                    onClick={() => headSort("views")}
+                  >
+                    <span>
+                      Views
+                      {sort.key === "views" && (
+                        <i className={s.arrow}>{sort.dir === 1 ? "▲" : "▼"}</i>
+                      )}
+                    </span>
+                  </th>
+                  <th className={s.thPlain}>
+                    <span aria-label="Actions" />
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((ev) => {
+                  const rc = respCount(ev);
+                  return (
+                    <tr key={ev.id} onClick={() => router.push(`/dashboard/events/${ev.id}`)}>
+                      <td>
+                        <span className={s.evCell}>
+                          <b>{ev.title}</b>
+                          <span>
+                            {[ev.location, audienceLabel(ev.audience)]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
+                        </span>
+                      </td>
+                      <td>{getDisplayDate(ev)}</td>
+                      <td>
+                        <span
+                          className={`badge${ev.status === "published" ? "" : " badge--muted"}`}
+                        >
+                          {ev.status === "published" ? "Published" : "Draft"}
+                        </span>
+                      </td>
+                      <td>
+                        {ev.form_id ? (
+                          <Link
+                            className={s.cellLink}
+                            href={`/dashboard/responses?form=${ev.form_id}`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {rc}
+                          </Link>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className={s.numCell}>{ev.view_count || 0}</td>
+                      <td>
+                        <span className={s.rowActions}>
+                          <button
+                            type="button"
+                            className={s.iconBtn}
+                            title="Edit"
+                            aria-label={`Edit ${ev.title}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/dashboard/events/${ev.id}`);
+                            }}
+                          >
+                            <PencilSimple size={14} weight="bold" />
+                          </button>
+                          <button
+                            type="button"
+                            className={s.iconBtn}
+                            title={ev.status === "published" ? "Move to drafts" : "Publish"}
+                            aria-label={ev.status === "published" ? "Move to drafts" : "Publish"}
+                            disabled={togglingId === ev.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleStatus(ev);
+                            }}
+                          >
+                            {ev.status === "published" ? (
+                              <Eye size={14} weight="bold" />
+                            ) : (
+                              <EyeSlash size={14} weight="bold" />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            className={`${s.iconBtn} ${s.iconBtnDanger}`}
+                            title="Delete"
+                            aria-label={`Delete ${ev.title}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteConfirm(ev);
+                            }}
+                          >
+                            <Trash size={14} weight="bold" />
+                          </button>
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
-      {/* Delete Confirmation */}
+      {/* ── Delete confirmation ── */}
       {deleteConfirm && (
         <div
-          style={{
-            position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
-            backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9000,
-          }}
+          className="fixed inset-0 z-[9000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
           onClick={() => setDeleteConfirm(null)}
         >
           <div
-            style={{
-              background: "var(--color-surface)", border: "1px solid var(--color-border)",
-              borderRadius: 20, padding: 32, width: 400, textAlign: "center", boxShadow: "var(--shadow-lg)",
-            }}
+            className="w-full max-w-md rounded-2xl keep-radius border border-line bg-surface p-8 text-center shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ fontSize: 18, fontWeight: 700, color: "var(--color-ink)", marginBottom: 12 }}>Delete Event?</div>
-            <p style={{ color: "var(--color-muted)", fontSize: 14, marginBottom: 24 }}>This action cannot be undone.</p>
-            <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+            <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-danger-soft text-danger">
+              <Trash size={24} weight="duotone" />
+            </span>
+            <div className="mt-4 font-heading text-lg font-semibold">Delete Event?</div>
+            <p className="mt-2 text-[14px] text-muted">
+              “{deleteConfirm.title || "Untitled event"}” will be permanently
+              removed. This action cannot be undone.
+            </p>
+            <div className="mt-6 flex justify-center gap-3">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                style={{
-                  padding: "10px 20px", borderRadius: 12, border: "1px solid var(--color-border)",
-                  background: "var(--color-bg)", color: "var(--color-ink)", fontSize: 14, fontWeight: 600,
-                  cursor: "pointer", fontFamily: "inherit",
-                }}
-              >Cancel</button>
+                className="rounded-full border border-line px-6 py-3 text-[13px] font-medium text-ink-soft transition-colors hover:border-primary-mist hover:text-primary"
+              >
+                Cancel
+              </button>
               <button
-                onClick={() => handleDelete(deleteConfirm)}
-                style={{
-                  padding: "10px 20px", borderRadius: 12, border: "none",
-                  background: "#dc2626", color: "white", fontSize: 14, fontWeight: 600,
-                  cursor: "pointer", fontFamily: "inherit",
-                }}
-              >Delete</button>
+                onClick={() => handleDelete(deleteConfirm.id)}
+                className="rounded-full bg-danger px-6 py-3 text-[13px] font-medium text-white transition-shadow hover:shadow-md"
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>

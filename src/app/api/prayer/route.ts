@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readPrayerSlug } from "@/lib/serverSettings";
+import { prayerApiUrl } from "@/lib/settings";
 
-const API_URL = "https://api.masjidbox.com/1.0/masjidbox/landing/athany/masjidassunnah";
 const API_KEY = "JejYcMS7hsOsZTPDk2ZhKOAlW9IyQ6Px";
 
 interface Prayer {
@@ -80,9 +81,9 @@ function sydneyDateKey(date: Date): string {
   return date.toLocaleDateString("en-CA", { timeZone: "Australia/Sydney" });
 }
 
-async function fetchWindow(begin: string | null): Promise<DayEntry[]> {
+async function fetchWindow(apiUrl: string, begin: string | null): Promise<DayEntry[]> {
   const params = begin ? `?get=at&begin=${begin}&days=7` : "?get=at&days=7";
-  const res = await fetch(`${API_URL}${params}`, {
+  const res = await fetch(`${apiUrl}${params}`, {
     headers: { apikey: API_KEY },
     next: { revalidate: 0 },
     cache: "no-store",
@@ -94,13 +95,14 @@ async function fetchWindow(begin: string | null): Promise<DayEntry[]> {
 
 export async function GET(_request: NextRequest) {
   try {
+    const apiUrl = prayerApiUrl(await readPrayerSlug());
     const today = new Date();
     const pastBegin = new Date(today);
     pastBegin.setDate(pastBegin.getDate() - 6);
 
     const [past, future] = await Promise.all([
-      fetchWindow(sydneyDateKey(pastBegin)),
-      fetchWindow(null),
+      fetchWindow(apiUrl, sydneyDateKey(pastBegin)),
+      fetchWindow(apiUrl, null),
     ]);
 
     const seen = new Set<string>();

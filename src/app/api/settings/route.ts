@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { getSessionUser, unauthorized } from "@/lib/supabase/server";
-import { DEFAULT_SETTINGS, SECTIONS, mergeSettings, allFieldKeys, setPath, getPath } from "@/lib/settings";
+import { SECTIONS, allFieldKeys, setPath, getPath } from "@/lib/settings";
+import { readSettings, writeSettings } from "@/lib/serverSettings";
 
 export const dynamic = "force-dynamic";
 
@@ -13,40 +13,6 @@ const CORS_HEADERS: Record<string, string> = {
 
 export function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
-}
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-// Settings live in app_metadata of a designated owner account (no SQL needed).
-// Prefer the primary admin, fall back to the oldest user.
-async function readSettings(): Promise<Record<string, unknown>> {
-  const { data, error } = await supabase.auth.admin.listUsers({ perPage: 200 });
-  if (error || !data?.users?.length) return DEFAULT_SETTINGS as unknown as Record<string, unknown>;
-  const users = [...data.users].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  );
-  const withSettings = users.find((u) => (u.app_metadata as Record<string, unknown>)?.site_settings);
-  const source = (withSettings ?? users[0]).app_metadata as Record<string, unknown>;
-  return mergeSettings(DEFAULT_SETTINGS, source.site_settings);
-}
-
-async function writeSettings(settings: Record<string, unknown>): Promise<void> {
-  const { data } = await supabase.auth.admin.listUsers({ perPage: 200 });
-  const users = data?.users ?? [];
-  if (!users.length) throw new Error("No users found");
-  const sorted = [...users].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  );
-  const owner =
-    sorted.find((u) => u.email === "admin@masjidassunnah.com.au") ??
-    sorted.find((u) => (u.app_metadata as Record<string, unknown>)?.site_settings) ??
-    sorted[0];
-  const meta = { ...(owner.app_metadata as Record<string, unknown>), site_settings: settings };
-  const { error } = await supabase.auth.admin.updateUserById(owner.id, { app_metadata: meta });
-  if (error) throw new Error(error.message);
 }
 
 export async function GET() {

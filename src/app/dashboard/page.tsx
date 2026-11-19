@@ -437,7 +437,7 @@ export default function DashboardHome() {
 
       <div className="active-header">
         <h2>All Events</h2>
-        <Link href="/dashboard/events" style={{ textDecoration: "none" }}>
+        <Link href="/dashboard/events/new" style={{ textDecoration: "none" }}>
           <button className="btn-primary">New Event</button>
         </Link>
       </div>

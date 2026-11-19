@@ -1,0 +1,2643 @@
+/* ==========================================================================
+   Prayer Times â€” website-parity page.
+   Header (eyebrow / display title / pill actions) â†’ hero panel: dark
+   next-prayer card + week navigation + a seven-day board, then the
+   full-month timetable with its .csv export.
+   Motion mirrors web/src/index.css via the .wsite layer (.reveal stagger,
+   .tilt pointer-3D) plus local keyframes for rows and date transitions.
+   ========================================================================== */
+
+.root {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.band {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.inner {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+/* â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+
+.head {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px 32px;
+}
+
+.headSide {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* â”€â”€ Hero panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+
+.panel {
+  flex: 1 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  background: #ffffff;
+  border: 1px solid #e4e9e5;
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 30px 70px -50px rgba(15, 74, 54, 0.6);
+}
+
+@media (min-width: 1040px) {
+  .panel {
+    grid-template-columns: 342px minmax(0, 1fr);
+  }
+}
+
+/* â”€â”€ Dark next-prayer card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+
+.next {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+  padding: 30px 28px;
+  min-height: 320px;
+  color: #f2f7f4;
+  background:
+    radial-gradient(120% 80% at 18% -10%, #15654a 0%, rgba(21, 101, 74, 0) 62%),
+    linear-gradient(165deg, #0b3a2b 0%, var(--color-primary-deep, #06140f) 78%);
+}
+
+.girih {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Everything but the texture sits above it. `.nextGlow` must stay out of this
+   rule — `:not()` bumps specificity to (0,2,0) and would win over the
+   `.nextGlow` selector's own `position: absolute`, dropping the glow into the
+   flex flow. */
+.next > *:not(.girih):not(.nextGlow) {
+  position: relative;
+  z-index: 1;
+}
+
+.nextGlow {
+  position: absolute;
+  top: -60px;
+  right: -55px;
+  width: 230px;
+  height: 230px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(199, 168, 75, 0.3) 0%, rgba(199, 168, 75, 0) 70%);
+  filter: blur(6px);
+  pointer-events: none;
+  z-index: 0;
+  animation: glow-breathe 7s ease-in-out infinite;
+}
+
+@keyframes glow-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
+.nextEyebrow {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+}
+
+.nextTop {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.nextIcon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(199, 168, 75, 0.35);
+  color: var(--color-gold);
+}
+
+.nextName {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  color: #ffffff;
+}
+
+.nextName em {
+  font-style: normal;
+  font-size: 15px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.5);
+  margin-left: 9px;
+}
+
+.nextWhen {
+  margin-top: 3px;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.nextCount {
+  font-size: clamp(36px, 5.4vw, 46px);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.02;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.nextUntil {
+  display: block;
+  margin-top: 7px;
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.nextTrack {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.nextFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-gold) 0%, rgba(199, 168, 75, 0.35) 100%);
+  transition: width 0.9s linear;
+}
+
+.nextTimes {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 13px;
+  overflow: hidden;
+}
+
+.nextTimeCell {
+  display: block;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 11px 13px;
+}
+
+.nextTimeCell > span {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+  margin-bottom: 3px;
+}
+
+.nextTimeCell b {
+  font-size: 17px;
+  font-weight: 700;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The rule behind that iqamah: +5 min / Fixed Time / No Iqama. */
+.nextRule {
+  display: block;
+  font-style: normal;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+  margin-top: 4px;
+}
+
+.nextSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding-top: 6px;
+}
+
+.nextSkeleton i {
+  display: block;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  animation: shimmer-dark 1.5s ease-in-out infinite;
+}
+
+.nextSkeleton i:nth-child(1) { width: 44%; }
+.nextSkeleton i:nth-child(2) { width: 76%; height: 36px; }
+.nextSkeleton i:nth-child(3) { width: 58%; }
+
+@keyframes shimmer-dark {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.95; }
+}
+
+/* â”€â”€ Board â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+
+.board {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* A gold sweep runs along the top while the newly selected day resolves. */
+.boardBusy::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 34%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--color-gold), transparent);
+  animation: sweep 1.15s var(--ease-in-out) infinite;
+  z-index: 3;
+}
+
+@keyframes sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(330%); }
+}
+
+/* â”€â”€ Date navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+
+.dateNav {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 22px;
+  background: linear-gradient(180deg, #f4f9f6 0%, #ffffff 100%);
+  border-bottom: 1px solid #edf1ee;
+}
+
+.navBtn {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border: 1px solid #dfe6e1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--color-primary);
+  cursor: pointer;
+  transition:
+    background-color 0.24s var(--ease-out),
+    border-color 0.24s var(--ease-out),
+    color 0.24s var(--ease-out),
+    transform 0.24s var(--ease-out),
+    box-shadow 0.24s var(--ease-out);
+}
+
+.navBtn:hover {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+  transform: scale(1.07);
+  box-shadow: 0 10px 22px -14px rgba(15, 74, 54, 0.9);
+}
+
+.navBtn:active {
+  transform: scale(0.95);
+}
+
+.dateBlock {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  animation: date-in 0.42s var(--ease-out) both;
+}
+
+.dateBlock[data-dir="-1"] {
+  animation-name: date-in-back;
+}
+
+@keyframes date-in {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes date-in-back {
+  from { opacity: 0; transform: translateX(-24px); }
+  to { opacity: 1; transform: none; }
+}
+
+.dateGreg {
+  font-size: clamp(17px, 2.1vw, 22px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: #0d1310;
+}
+
+.dateToday {
+  display: inline-block;
+  margin-left: 9px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--color-gold-soft);
+  color: var(--color-gold-deep);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* Only offered when the day on screen is not today. */
+.todayBtn {
+  display: inline-block;
+  margin-left: 9px;
+  padding: 4px 13px;
+  border: 1px solid var(--color-gold);
+  border-radius: 999px;
+  background: var(--color-gold-soft);
+  color: var(--color-gold-deep);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  cursor: pointer;
+  transition:
+    background-color 0.24s var(--ease-out),
+    color 0.24s var(--ease-out),
+    transform 0.24s var(--ease-out);
+}
+
+.todayBtn:hover {
+  background: var(--color-gold);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.todayBtn:active {
+  transform: none;
+}
+
+.dateHijri {
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+/* -------------------------------------------------------------------------- */
+/* The day board - one day on screen, its week already resolved behind it      */
+/* -------------------------------------------------------------------------- */
+
+/* Kept for the month table, which still dims while a new month lands. */
+.rowsDim {
+  opacity: 0.42;
+  filter: saturate(0.55);
+}
+
+.rows {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  animation: day-shift 0.34s var(--ease-out) both;
+}
+
+.rows[data-dir="-1"] {
+  animation-name: day-shift-back;
+}
+
+@keyframes day-shift {
+  from { transform: translateX(16px); }
+  to { transform: none; }
+}
+
+@keyframes day-shift-back {
+  from { transform: translateX(-16px); }
+  to { transform: none; }
+}
+
+/* Icon, prayer, athan, iqamah - the header and every row share one grid so
+   the four columns line up exactly. */
+.rowsHead,
+.row,
+.skelRow {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 104px 116px;
+  align-items: center;
+  gap: 10px;
+}
+
+.rowsHead {
+  flex-shrink: 0;
+  padding: 14px 22px 9px;
+  border-bottom: 1px solid #f1f4f2;
+}
+
+.rowsHead span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9aa8a1;
+  text-align: center;
+}
+
+.rowsHead span:nth-child(2) {
+  text-align: left;
+}
+
+.row {
+  position: relative;
+  padding: 13px 22px;
+  border-bottom: 1px solid #f1f4f2;
+  animation: row-rise 0.55s var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 50ms);
+  transition: background-color 0.28s var(--ease-out);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+@keyframes row-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .row:hover {
+    background: #f7faf8;
+  }
+
+  .row:hover .rowIcon {
+    transform: translateY(-2px);
+    border-color: var(--color-primary);
+  }
+}
+
+/* The prayer whose adhan is being called right now. */
+.rowActive {
+  background: #fbf7ec;
+}
+
+.rowActive::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-gold);
+  z-index: 1;
+}
+
+.rowActive .rowIcon {
+  background: var(--color-gold-soft);
+  color: var(--color-gold-deep);
+}
+
+.rowIcon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--color-primary-mist);
+  border: 1px solid transparent;
+  color: var(--color-primary);
+  transition:
+    transform 0.28s var(--ease-out),
+    background-color 0.28s var(--ease-out),
+    border-color 0.28s var(--ease-out),
+    color 0.28s var(--ease-out);
+}
+
+.rowName {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.rowName strong {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0d1310;
+  white-space: nowrap;
+}
+
+.rowName em {
+  font-style: normal;
+  line-height: 1;
+  font-size: 12.5px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+/* The athan cell holds one line, the iqamah cell two; a shared minimum keeps
+   both first lines on the same baseline instead of drifting apart. */
+.rowTime {
+  text-align: center;
+  min-height: 30px;
+}
+
+.rowTime b {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #0d1310;
+}
+
+.rowActive .rowTime b {
+  color: var(--color-gold-deep);
+}
+
+/* The rule behind that iqamah: +5 min / Fixed Time / No Iqama. */
+.rowRule {
+  display: block;
+  font-style: normal;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-gold-deep);
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.rowNone {
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: #b6c0ba;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Loading skeleton                                                            */
+/* -------------------------------------------------------------------------- */
+
+.skelRow i {
+  display: block;
+  height: 13px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #eef2ef 0%, #f7faf8 50%, #eef2ef 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+.skelRow i:first-child {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* â”€â”€ Error inside the board â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+
+.boardError {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--color-danger);
+  font-size: 14px;
+}
+
+.retry {
+  padding: 9px 18px;
+  border: 1px solid #dfe6e1;
+  border-radius: 999px;
+  background: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #3f4a44;
+  cursor: pointer;
+  transition:
+    background-color 0.2s var(--ease-out),
+    border-color 0.2s var(--ease-out),
+    color 0.2s var(--ease-out);
+}
+
+.retry:hover {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Full month timetable + .csv export                                         */
+/* -------------------------------------------------------------------------- */
+
+.month {
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid #e4e9e5;
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 30px 70px -50px rgba(15, 74, 54, 0.5);
+}
+
+.monthBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  background: linear-gradient(180deg, #f4f9f6 0%, #ffffff 100%);
+  border-bottom: 1px solid #edf1ee;
+}
+
+.monthNav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.monthNav .navBtn {
+  width: 36px;
+  height: 36px;
+}
+
+.monthTitle {
+  min-width: 168px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #0d1310;
+}
+
+.monthExport {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.monthYearLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9aa8a1;
+}
+
+.selectWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.selectWrap::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-right: 1.6px solid var(--color-primary);
+  border-bottom: 1.6px solid var(--color-primary);
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+
+.yearSelect {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 38px;
+  padding: 0 30px 0 14px;
+  border: 1px solid #dfe6e1;
+  border-radius: 999px;
+  background: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0d1310;
+  cursor: pointer;
+  transition:
+    border-color 0.24s var(--ease-out),
+    box-shadow 0.24s var(--ease-out);
+}
+
+.yearSelect:hover {
+  border-color: var(--color-primary);
+}
+
+.yearSelect:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(15, 74, 54, 0.14);
+}
+
+.btnExport {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 18px;
+  border: 1px solid var(--color-primary);
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background-color 0.24s var(--ease-out),
+    transform 0.24s var(--ease-out),
+    opacity 0.24s var(--ease-out);
+}
+
+.btnExport:hover:not(:disabled) {
+  background: var(--color-primary-dark);
+  transform: translateY(-1px);
+}
+
+.btnExport:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.monthScroll {
+  overflow-x: auto;
+}
+
+.monthTable {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.monthTable thead th {
+  padding: 11px 10px;
+  background: #f7faf8;
+  border-bottom: 1px solid #e4e9e5;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: #9aa8a1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.monthTable thead th:first-child,
+.monthTable thead th:nth-child(2) {
+  text-align: left;
+}
+
+.monthTable tbody th,
+.monthTable tbody td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #f1f4f2;
+  text-align: center;
+}
+
+.monthTable tbody tr:last-child th,
+.monthTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.monthTable tbody .mDate {
+  width: 62px;
+  padding-left: 18px;
+  text-align: left;
+}
+
+.mDate b {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0d1310;
+  line-height: 1.15;
+}
+
+.mDate em {
+  display: block;
+  font-style: normal;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9aa8a1;
+}
+
+.monthTable tbody .mHijri {
+  text-align: left;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.monthTable tbody .mTime b {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0d1310;
+}
+
+.monthTable tbody .mTime i {
+  display: block;
+  font-style: normal;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-primary);
+  margin-top: 1px;
+}
+
+.monthTable tbody .mTime .mNoIq {
+  color: #c3ccc6;
+  font-weight: 500;
+}
+
+.monthTable tbody .mTime .mRule {
+  display: block;
+  font-style: normal;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-gold-deep);
+  white-space: nowrap;
+  margin-top: 1px;
+}
+
+/* Friday - the day Jumuah falls on. */
+.monthTable tbody .isFriday th,
+.monthTable tbody .isFriday td {
+  background: #fdfaf0;
+}
+
+.monthSkel {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  padding: 20px 18px;
+}
+
+.monthSkel i {
+  display: block;
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #eef2ef 0%, #f7faf8 50%, #eef2ef 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+/* â”€â”€ Status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+
+.status {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.hint {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--color-muted);
+}
+
+/* â”€â”€ Responsive â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+
+@media (max-width: 720px) {
+  /* The board's four columns share one padding so they stay aligned. */
+  .rowsHead,
+  .row {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .dateNav {
+    padding: 15px;
+    gap: 9px;
+  }
+
+  .next {
+    padding: 24px 20px;
+    min-height: 0;
+  }
+
+  .hint {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .monthBar {
+    padding: 14px;
+  }
+
+  .monthTitle {
+    min-width: 0;
+    font-size: 15px;
+  }
+}
+
+/* â”€â”€ Reduced motion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+
+@media (prefers-reduced-motion: reduce) {
+  .rows,
+  .row,
+  .dateBlock,
+  .nextGlow,
+  .skelRow i,
+  .monthSkel i,
+  .nextSkeleton i {
+    animation: none;
+  }
+
+  .boardBusy::before {
+    animation: none;
+    width: 100%;
+    opacity: 0.6;
+  }
+
+  .rowIcon,
+  .navBtn,
+  .btnExport,
+  .yearSelect,
+  .nextFill,
+  .retry {
+    transition: none;
+  }
+
+  .navBtn:hover,
+  .navBtn:active,
+  .btnExport:hover {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   Settings pages — the three modals are now full pages.
+   White canvas filling the section: a top bar (back link + autosave settings),
+   an eyebrow/title header, an optional two-step indicator, the body, then a
+   footer carrying Next / Save / the confirm bar. Content rows stagger in via
+   an inline `--i`.
+   ========================================================================== */
+
+.set {
+  position: relative;
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 100%;
+}
+
+/* ── Top bar ─────────────────────────────────────────────────────────────── */
+
+.setTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px 8px 12px;
+  border: 1px solid #dfe6e1;
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #3f4a44;
+  cursor: pointer;
+  transition:
+    background-color 0.24s var(--ease-out),
+    border-color 0.24s var(--ease-out),
+    color 0.24s var(--ease-out),
+    transform 0.24s var(--ease-out);
+}
+
+.back:hover {
+  background: var(--color-primary-mist);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  transform: translateX(-2px);
+}
+
+.setTopRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.settingsLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px;
+  border: 1px solid #dfe6e1;
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #3f4a44;
+  cursor: pointer;
+  transition:
+    background-color 0.24s var(--ease-out),
+    border-color 0.24s var(--ease-out),
+    color 0.24s var(--ease-out);
+}
+
+.settingsLink:hover {
+  background: var(--color-primary-mist);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+
+.setHead {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.setEyebrow {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--color-gold-deep);
+}
+
+.setTitle {
+  margin: 0;
+  font-size: clamp(21px, 2.6vw, 27px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.14;
+  color: #101613;
+}
+
+.setSub {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--color-muted);
+}
+
+/* ── Step indicator (Settings → Review) ──────────────────────────────────── */
+
+.steps {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.step {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--color-muted);
+}
+
+.stepDot {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border: 1.5px solid #d5ded8;
+  border-radius: 50%;
+  background: #ffffff;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+  transition:
+    background-color 0.3s var(--ease-out),
+    border-color 0.3s var(--ease-out),
+    color 0.3s var(--ease-out);
+}
+
+.stepLabel {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.stepLine {
+  width: clamp(28px, 5vw, 64px);
+  height: 1.5px;
+  background: #e3eae5;
+  transition: background-color 0.3s var(--ease-out);
+}
+
+.stepOn {
+  color: var(--color-primary);
+}
+
+.stepOn .stepDot {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+.stepOn .stepLine {
+  background: var(--color-primary);
+}
+
+/* ── Body / footer ──────────────────────────────────────────────────────── */
+
+.setBody {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 860px;
+}
+
+.setFoot {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 0 4px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #ffffff 34%);
+}
+
+.footLeft,
+.footRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ── Loading / failure ───────────────────────────────────────────────────── */
+
+.setState {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 34px 26px;
+  border: 1px dashed #d5ded8;
+  border-radius: 18px;
+  background: #fbfcfb;
+}
+
+.setState strong {
+  font-size: 15px;
+  color: #101613;
+}
+
+.setState span {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-muted);
+  max-width: 56ch;
+}
+
+.setStateBusy {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: 2px solid #d5ded8;
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Review step: the dark timetable panel ───────────────────────────────── */
+
+.timetable {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 18px;
+  box-shadow: 0 26px 50px -34px rgba(6, 20, 15, 0.8);
+  background:
+    radial-gradient(120% 90% at 12% -15%, #15654a 0%, rgba(21, 101, 74, 0) 62%),
+    linear-gradient(160deg, #0b3a2b 0%, var(--color-primary-deep, #06140f) 82%);
+}
+
+.previewGirih,
+.previewGlow {
+  z-index: 0;
+}
+
+.ttRow {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(76px, 1fr) minmax(110px, auto) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  animation: row-in 0.42s var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 34ms);
+}
+
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: none; }
+}
+
+.ttRow:last-child {
+  border-bottom: none;
+}
+
+.ttRowMuted .ttName,
+.ttRowMuted .ttTime {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.ttName {
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #f2f7f4;
+}
+
+.ttTimes {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.ttTime {
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+}
+
+.ttIqamah {
+  font-size: 12px;
+  font-weight: 600;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-gold);
+}
+
+/* ── − 0 + offset control, on the dark panel ────────────────────────────── */
+
+.ttOff {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ttOffBtn {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #f2f7f4;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 0.22s var(--ease-out),
+    color 0.22s var(--ease-out),
+    transform 0.22s var(--ease-out);
+}
+
+.ttOffBtn:hover:not(:disabled) {
+  background: var(--color-gold);
+  color: #06140f;
+  transform: scale(1.08);
+}
+
+.ttOffBtn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.ttOffBtn:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+.ttOffVal {
+  min-width: 34px;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+}
+
+/* ── Review footer ──────────────────────────────────────────────────────── */
+
+.reviewDate {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.confirmWrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.confirmWrap .confirm {
+  flex: 1 1 auto;
+}
+
+/* ── Choice cards (Edit Prayer Times → Athan / Iqamah) ──────────────────── */
+
+.choiceGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 13px;
+}
+
+@media (max-width: 560px) {
+  .choiceGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.choice {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 20px 18px 18px;
+  border: 1px solid #e6ebe7;
+  border-radius: 18px;
+  background: #ffffff;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 0.3s var(--ease-out),
+    border-color 0.3s var(--ease-out),
+    box-shadow 0.3s var(--ease-out);
+  animation: card-in 0.5s var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+.choice:hover {
+  transform: translateY(-3px);
+  border-color: var(--color-primary);
+  box-shadow: 0 20px 36px -26px rgba(15, 74, 54, 0.6);
+}
+
+.choice:active {
+  transform: translateY(-1px);
+}
+
+.choiceIcon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--color-primary-mist);
+  color: var(--color-primary);
+  transition:
+    background-color 0.3s var(--ease-out),
+    color 0.3s var(--ease-out),
+    transform 0.3s var(--ease-out);
+}
+
+.choice:hover .choiceIcon {
+  background: var(--color-primary);
+  color: #ffffff;
+  transform: scale(1.06);
+}
+
+.choiceName {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #101613;
+}
+
+.choiceDesc {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--color-muted);
+}
+
+.choiceArrow {
+  position: absolute;
+  top: 22px;
+  right: 18px;
+  color: #c9d3cc;
+  transition:
+    color 0.3s var(--ease-out),
+    transform 0.3s var(--ease-out);
+}
+
+.choice:hover .choiceArrow {
+  color: var(--color-primary);
+  transform: translateX(3px);
+}
+
+/* Shared stagger used by every repeated row below. */
+.option,
+.rule,
+.jumuah,
+.durationRow,
+.previewRow {
+  animation: card-in 0.5s var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── Fields ─────────────────────────────────────────────────────────────── */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.fieldLabel {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #3f4a44;
+}
+
+.labelIcon {
+  color: var(--color-gold-deep);
+  flex-shrink: 0;
+}
+
+.fieldHint {
+  font-size: 12px;
+  color: var(--color-muted);
+  margin-top: -3px;
+}
+
+.select {
+  appearance: none;
+  width: 100%;
+  padding: 13px 42px 13px 15px;
+  border: 1px solid #dfe6e1;
+  border-radius: 13px;
+  background: #ffffff
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7d72' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6,9 12,15 18,9'/%3E%3C/svg%3E")
+    no-repeat right 15px center;
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #101613;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.22s var(--ease-out),
+    box-shadow 0.22s var(--ease-out);
+}
+
+.select:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(15, 74, 54, 0.07);
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(15, 74, 54, 0.12);
+}
+
+.input {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid #dfe6e1;
+  border-radius: 13px;
+  background: #ffffff;
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #101613;
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color 0.22s var(--ease-out),
+    box-shadow 0.22s var(--ease-out);
+}
+
+.input:hover {
+  border-color: #c9d3cc;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(15, 74, 54, 0.12);
+}
+
+.input:disabled {
+  background: #f4f6f5;
+  color: #a8b1ac;
+  cursor: not-allowed;
+}
+
+/* ── Option list (calculation method) ───────────────────────────────────── */
+
+.optionList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid #e6ebe7;
+  border-radius: 15px;
+  background: #fbfcfb;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 11px 12px;
+  border: none;
+  border-radius: 11px;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.16s var(--ease-out),
+    transform 0.16s var(--ease-out);
+}
+
+.option:hover {
+  background: #eef4f0;
+  transform: translateX(3px);
+}
+
+.optionActive {
+  background: var(--color-primary-mist);
+}
+
+.optionDot {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  border: 1.8px solid #cbd4ce;
+  border-radius: 50%;
+  transition:
+    border-color 0.2s var(--ease-out),
+    box-shadow 0.2s var(--ease-out);
+}
+
+.optionDotOn {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(15, 74, 54, 0.1);
+}
+
+.optionDotOn::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+
+.optionCheck {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
+
+.optionText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.optionText strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: #101613;
+  line-height: 1.3;
+}
+
+.optionText em {
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--color-muted);
+}
+
+/* ── Sub card (custom Fajr/Isha, Taraweeh, Imsak, Iftar) ────────────────── */
+
+.subCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 17px;
+  border: 1px solid #e6ebe7;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fafcfb 0%, #ffffff 60%);
+}
+
+.subTitle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--color-primary);
+}
+
+.subTitleIcon {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-primary-mist);
+  color: var(--color-primary);
+}
+
+.rangeNote {
+  font-size: 11.5px;
+  color: var(--color-muted);
+}
+
+.rangeNoteBad {
+  color: var(--color-danger);
+}
+
+/* ── Segmented control (pills) ──────────────────────────────────────────── */
+
+.segment,
+.segSmall {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #e6ebe7;
+  border-radius: 999px;
+  background: #f2f6f3;
+}
+
+.segment {
+  width: 100%;
+}
+
+.segSmall {
+  flex: 1;
+  min-width: 240px;
+}
+
+.segmentBtn,
+.segSmallBtn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 0.24s var(--ease-out),
+    color 0.24s var(--ease-out),
+    box-shadow 0.24s var(--ease-out),
+    transform 0.24s var(--ease-out);
+}
+
+.segmentBtn {
+  padding: 10px 16px;
+  font-size: 13.5px;
+  color: #6b7d72;
+}
+
+.segSmallBtn {
+  padding: 7px 13px;
+  font-size: 12.5px;
+  color: #6b7d72;
+}
+
+.segmentBtn:hover:not(.segmentBtnActive),
+.segSmallBtn:hover:not(.segSmallBtnOn) {
+  color: var(--color-primary);
+}
+
+.segmentBtnActive,
+.segSmallBtnOn {
+  background: var(--color-primary);
+  color: #ffffff;
+  box-shadow: 0 4px 12px -7px rgba(15, 74, 54, 0.9);
+}
+
+.segCheck {
+  flex-shrink: 0;
+}
+
+/* ── Stepper (circular buttons) ─────────────────────────────────────────── */
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px;
+  border: 1px solid #e6ebe7;
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.stepBtn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: #f1f5f2;
+  color: var(--color-primary);
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 0.22s var(--ease-out),
+    color 0.22s var(--ease-out),
+    transform 0.22s var(--ease-spring);
+}
+
+.stepBtn:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: #ffffff;
+  transform: scale(1.09);
+}
+
+.stepBtn:active:not(:disabled) {
+  transform: scale(0.9);
+}
+
+.stepBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.stepVal {
+  min-width: 58px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #101613;
+}
+
+.stepUnit {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+/* ── Stepper, dark variant (sits on the girih timetable panel) ───────────── */
+
+.stepperDark {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.stepBtnDark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #f2f7f4;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 0.22s var(--ease-out),
+    color 0.22s var(--ease-out),
+    transform 0.22s var(--ease-spring);
+}
+
+.stepBtnDark:hover:not(:disabled) {
+  background: var(--color-gold);
+  color: var(--color-primary-deep, #06140f);
+  transform: scale(1.08);
+}
+
+.stepBtnDark:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.stepBtnDark:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+.stepValDark {
+  min-width: 58px;
+  text-align: center;
+  font-size: 13.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+}
+
+.stepUnitDark {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* ── Per-prayer iqamah rows ─────────────────────────────────────────────── */
+
+.ruleList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rule {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 14px;
+  border: 1px solid #e6ebe7;
+  border-radius: 17px;
+  background: #ffffff;
+  transition:
+    transform 0.3s var(--ease-out),
+    border-color 0.3s var(--ease-out),
+    box-shadow 0.3s var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .rule:hover {
+    transform: translateY(-2px);
+    border-color: #d3ded8;
+    box-shadow: 0 16px 32px -26px rgba(15, 74, 54, 0.6);
+  }
+
+  .rule:hover .ruleIcon {
+    background: var(--color-gold-soft);
+    color: var(--color-gold-deep);
+  }
+}
+
+.ruleHead {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.ruleIcon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-primary-mist);
+  color: var(--color-primary);
+  transition:
+    background-color 0.3s var(--ease-out),
+    color 0.3s var(--ease-out);
+}
+
+.ruleName {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #101613;
+}
+
+.ruleAthan {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ruleControls {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+/* ── Dark preview panel ─────────────────────────────────────────────────── */
+
+.preview {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 18px;
+  box-shadow: 0 26px 50px -34px rgba(6, 20, 15, 0.8);
+  background:
+    radial-gradient(120% 85% at 14% -10%, #15654a 0%, rgba(21, 101, 74, 0) 60%),
+    linear-gradient(165deg, #0b3a2b 0%, var(--color-primary-deep, #06140f) 80%);
+}
+
+.previewGirih {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.previewGlow {
+  position: absolute;
+  top: -48px;
+  right: -42px;
+  width: 175px;
+  height: 175px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(199, 168, 75, 0.32) 0%, rgba(199, 168, 75, 0) 70%);
+  filter: blur(4px);
+  pointer-events: none;
+  z-index: 0;
+  animation: glow-breathe 7s ease-in-out infinite;
+}
+
+@keyframes glow-breathe {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.09); }
+}
+
+.previewHead {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+}
+
+.previewHead em {
+  font-style: normal;
+  font-weight: 500;
+  font-size: 11.5px;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.previewRows {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  animation: preview-in 0.4s var(--ease-out) both;
+}
+
+@keyframes preview-in {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: none; }
+}
+
+.previewRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background-color 0.2s var(--ease-out);
+}
+
+.previewRow:last-child {
+  border-bottom: none;
+}
+
+.previewRow:hover {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.previewName {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.previewTime {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+}
+
+.previewTime em {
+  font-style: normal;
+  font-weight: 500;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.48);
+  margin-left: 8px;
+}
+
+.previewBusy {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 20px 18px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.previewBusy::before {
+  content: "";
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  border-top-color: var(--color-gold);
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Confirm bar (gold) ─────────────────────────────────────────────────── */
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid rgba(199, 168, 75, 0.45);
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--color-gold-soft) 0%, #fdfaf0 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.confirmText {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--color-gold-deep);
+}
+
+.confirmRow {
+  display: flex;
+  gap: 10px;
+}
+
+.btnYes,
+.btnNo {
+  flex: 1;
+  height: 46px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    transform 0.26s var(--ease-out),
+    background-color 0.26s var(--ease-out),
+    box-shadow 0.26s var(--ease-out),
+    opacity 0.26s var(--ease-out);
+}
+
+.btnYes {
+  border: none;
+  background: var(--color-primary-strong);
+  color: var(--color-bg);
+}
+
+.btnYes:hover:not(:disabled) {
+  background: var(--color-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 16px 28px -20px rgba(15, 74, 54, 0.95);
+}
+
+.btnYes:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+}
+
+.btnYes:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btnNo {
+  border: 1px solid rgba(154, 127, 52, 0.45);
+  background: transparent;
+  color: var(--color-gold-deep);
+}
+
+.btnNo:hover {
+  background: rgba(154, 127, 52, 0.1);
+  transform: translateY(-2px);
+}
+
+.btnNo:active {
+  transform: translateY(0) scale(0.985);
+}
+
+/* ── Footer buttons (pills) ─────────────────────────────────────────────── */
+
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 46px;
+  padding: 0 28px;
+  border: none;
+  border-radius: 999px;
+  background: var(--color-primary-strong);
+  color: var(--color-bg);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 0.26s var(--ease-out),
+    transform 0.26s var(--ease-out),
+    box-shadow 0.26s var(--ease-out),
+    opacity 0.26s var(--ease-out);
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: var(--color-primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.btnPrimary:disabled {
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
+}
+
+.btnGhost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 46px;
+  padding: 0 24px;
+  border: 1px solid var(--color-border-brand);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-primary-strong);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 0.26s var(--ease-out),
+    transform 0.26s var(--ease-out);
+}
+
+.btnGhost:hover {
+  background: var(--color-primary-mist);
+  transform: translateY(-2px);
+}
+
+.saveError {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--color-danger);
+}
+
+/* ── Jumuah rows ────────────────────────────────────────────────────────── */
+
+.jumuahList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.jumuah {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 14px;
+  border: 1px solid #e6ebe7;
+  border-radius: 17px;
+  background: #ffffff;
+  transition:
+    transform 0.3s var(--ease-out),
+    border-color 0.3s var(--ease-out),
+    box-shadow 0.3s var(--ease-out);
+}
+
+.jumuah:hover {
+  transform: translateY(-2px);
+  border-color: #d3ded8;
+  box-shadow: 0 16px 32px -26px rgba(15, 74, 54, 0.6);
+}
+
+.jumuahHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.jumuahRemove {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: transparent;
+  color: var(--color-danger);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: opacity 0.2s var(--ease-out);
+}
+
+.jumuahRemove:hover {
+  opacity: 0.7;
+}
+
+.timePair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 11px;
+}
+
+.timePair label,
+.stack label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5b6862;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.addBtn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 17px;
+  border: 1px dashed #c3d2c9;
+  border-radius: 999px;
+  background: #ffffff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-primary);
+  cursor: pointer;
+  transition:
+    background-color 0.24s var(--ease-out),
+    border-color 0.24s var(--ease-out),
+    transform 0.24s var(--ease-out);
+}
+
+.addBtn:hover:not(:disabled) {
+  background: var(--color-primary-mist);
+  border-color: var(--color-primary);
+  border-style: solid;
+  transform: translateY(-2px);
+}
+
+.addBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ── Duration rows ──────────────────────────────────────────────────────── */
+
+.durationList {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.durationRow {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 15px;
+  border: 1px solid #e6ebe7;
+  border-radius: 17px;
+  background: #ffffff;
+  transition:
+    transform 0.3s var(--ease-out),
+    border-color 0.3s var(--ease-out),
+    box-shadow 0.3s var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .durationRow:hover {
+    transform: translateY(-2px);
+    border-color: #d3ded8;
+    box-shadow: 0 16px 32px -26px rgba(15, 74, 54, 0.6);
+  }
+
+  .durationRow:hover .ruleIcon {
+    background: var(--color-gold-soft);
+    color: var(--color-gold-deep);
+  }
+}
+
+.durationName {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.durationName strong {
+  font-size: 15px;
+  font-weight: 700;
+  color: #101613;
+}
+
+.durationName em {
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--color-muted);
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .setTop {
+    gap: 10px;
+  }
+
+  .setBody {
+    gap: 15px;
+  }
+
+  .setFoot {
+    position: static;
+    padding-top: 4px;
+    background: none;
+  }
+
+  .confirmWrap {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ttRow {
+    grid-template-columns: 1fr auto;
+    gap: 8px 12px;
+    padding: 13px 15px;
+  }
+
+  .ttTimes {
+    align-items: flex-end;
+  }
+
+  .ttOff {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .timePair {
+    grid-template-columns: 1fr;
+  }
+
+  .segSmall {
+    min-width: 0;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .segSmallBtn {
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+
+  .btnYes,
+  .btnNo {
+    height: 44px;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+  }
+
+  .btnPrimary,
+  .btnGhost {
+    height: 44px;
+    padding: 0 20px;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+  }
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .previewGlow,
+  .previewRows,
+  .previewRow,
+  .choice,
+  .option,
+  .rule,
+  .jumuah,
+  .durationRow,
+  .ttRow,
+  .previewBusy::before,
+  .spinner {
+    animation: none;
+  }
+
+  .back,
+  .ttOffBtn,
+  .choice,
+  .choiceIcon,
+  .choiceArrow,
+  .option,
+  .rule,
+  .jumuah,
+  .durationRow,
+  .select,
+  .input,
+  .segmentBtn,
+  .segSmallBtn,
+  .stepBtn,
+  .stepBtnDark,
+  .stepDot,
+  .btnYes,
+  .btnNo,
+  .btnPrimary,
+  .btnGhost,
+  .addBtn,
+  .jumuahRemove {
+    transition: none;
+  }
+
+  .back:hover,
+  .back:active,
+  .ttOffBtn:hover,
+  .ttOffBtn:active,
+  .choice:hover,
+  .choice:active,
+  .choice:hover .choiceIcon,
+  .choice:hover .choiceArrow,
+  .option:hover,
+  .rule:hover,
+  .jumuah:hover,
+  .durationRow:hover,
+  .stepBtn:hover:not(:disabled),
+  .stepBtn:active:not(:disabled),
+  .stepBtnDark:hover:not(:disabled),
+  .stepBtnDark:active:not(:disabled),
+  .btnYes:hover:not(:disabled),
+  .btnYes:active:not(:disabled),
+  .btnNo:hover,
+  .btnNo:active,
+  .btnPrimary:hover:not(:disabled),
+  .btnGhost:hover,
+  .addBtn:hover:not(:disabled) {
+    transform: none;
+  }
+}

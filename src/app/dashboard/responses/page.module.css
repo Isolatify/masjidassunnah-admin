@@ -1,0 +1,115 @@
+/* ==========================================================================
+   Responses — the form chips that switch which form's answers the
+   ResultsPanel shows, plus the shared page header. Same tokens as the
+   events pages (.head / .headActions) and the global panel / badge /
+   rsp-* styles in globals.css. The active chip wears the section's gold.
+   ========================================================================== */
+
+/* -- Header ------------------------------------------------------------- */
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px 32px;
+  margin-bottom: 30px;
+}
+
+.head > :global(.page-header) {
+  margin-bottom: 0;
+}
+
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* -- Form chips ---------------------------------------------------------- */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-bottom: 22px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  padding: 9px 16px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: border-color 0.25s var(--ease-out), color 0.25s var(--ease-out),
+    transform 0.25s var(--ease-out), background 0.25s var(--ease-out);
+}
+
+.chip:hover {
+  border-color: var(--color-gold);
+  color: var(--color-gold-deep);
+  transform: translateY(-1px);
+}
+
+.chipOn,
+.chipOn:hover {
+  background: var(--color-gold-soft);
+  border-color: var(--color-gold);
+  color: var(--color-gold-deep);
+}
+
+.chipTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 340px;
+}
+
+.chipCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-gold-soft);
+  color: var(--color-gold-deep);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: normal;
+}
+
+.chipOn .chipCount {
+  background: var(--color-gold);
+  color: #fff;
+}
+
+/* -- Panel title count --------------------------------------------------- */
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 25px;
+  height: 25px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--color-gold-soft);
+  color: var(--color-gold-deep);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}

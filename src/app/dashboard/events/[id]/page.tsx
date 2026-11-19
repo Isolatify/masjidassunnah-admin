@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, use, useRef, useLayoutEffect, useMemo } from "react";
+import { useState, useEffect, useCallback, use, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -21,16 +21,31 @@ import {
   MagnifyingGlass,
   NotePencil,
   LinkSimple,
+  Image as ImageIcon,
+  Clock,
+  Question,
+  UsersThree,
+  Star,
 } from "@phosphor-icons/react";
 import { toast } from "@/components/Toast";
 import RichTextEditor from "@/components/RichTextEditor";
 import DateEditor from "@/components/DateEditor";
 import type { DateEntry } from "@/components/DateEditor";
+import ImageFlowModal from "@/components/events/ImageFlowModal";
 import { type FormRecord } from "@/lib/forms";
 import { deriveDateFields } from "@/lib/eventDates";
 import { SITE_URL } from "@/lib/siteUrl";
+import s from "./page.module.css";
 
 const AUDIENCE_OPTIONS = ["All", "Brothers", "Sisters", "Youth", "Children"] as const;
+
+const AUDIENCE_COLORS: Record<string, string> = {
+  All: "#c8a65d",
+  Brothers: "#03894a",
+  Sisters: "#9c7e3d",
+  Youth: "#026839",
+  Children: "#015230",
+};
 
 function untilPhraseFor(dateStr: string | null | undefined): string | null {
   if (!dateStr) return null;
@@ -55,14 +70,6 @@ function untilPhraseFor(dateStr: string | null | undefined): string | null {
   return "Moments";
 }
 
-const AUDIENCE_COLORS: Record<string, string> = {
-  All: "#c8a65d",
-  Brothers: "#03894a",
-  Sisters: "#9c7e3d",
-  Youth: "#026839",
-  Children: "#015230",
-};
-
 interface LinkEntry {
   label: string;
   url: string;
@@ -71,6 +78,11 @@ interface LinkEntry {
 interface PersonEntry {
   name: string;
   role: string;
+}
+
+interface FaqEntry {
+  question: string;
+  answer: string;
 }
 
 interface EventData {
@@ -92,7 +104,7 @@ interface EventData {
   dates_json: DateEntry[];
   links: LinkEntry[];
   persons: PersonEntry[];
-  faq?: { question: string; answer: string }[] | null;
+  faq?: FaqEntry[] | null;
   cost: string;
   form_id: string | null;
   register_url: string;
@@ -119,6 +131,7 @@ const EMPTY_EVENT: Partial<EventData> = {
   dates_json: [],
   links: [],
   persons: [],
+  faq: [],
   cost: "",
   form_id: null,
   register_url: "",
@@ -126,13 +139,27 @@ const EMPTY_EVENT: Partial<EventData> = {
   status: "draft",
 };
 
-function EditorModal({ onCancel, children }: { onCancel: () => void; children: React.ReactNode }) {
+/* Small labelled card used for every editor section. */
+function Section({
+  icon,
+  title,
+  hint,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="ev-overlay" onClick={onCancel}>
-      <div className="ev-modal" onClick={(e) => e.stopPropagation()}>
-        {children}
+    <section className={s.card}>
+      <div className={s.cardHead}>
+        <span className={s.cardIcon}>{icon}</span>
+        <span className={s.cardTitle}>{title}</span>
+        {hint && <span className={s.cardHint}>{hint}</span>}
       </div>
-    </div>
+      {children}
+    </section>
   );
 }
 
@@ -141,17 +168,14 @@ export default function EventEditorPage({ params }: { params: Promise<{ id: stri
   const router = useRouter();
   const isNew = id === "new";
 
-  const rootRef = useRef<HTMLDivElement>(null);
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const barRef = useRef<HTMLDivElement>(null);
-
   const [event, setEvent] = useState<Partial<EventData>>({ ...EMPTY_EVENT });
   const [snapshot, setSnapshot] = useState("");
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [initialFile, setInitialFile] = useState<File | null>(null);
   const [slugCheck, setSlugCheck] = useState<{ slug: string; available: boolean } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [discardConfirm, setDiscardConfirm] = useState(false);
@@ -161,7 +185,7 @@ export default function EventEditorPage({ params }: { params: Promise<{ id: stri
   const [newPerson, setNewPerson] = useState<PersonEntry>({ name: "", role: "" });
   const [formsList, setFormsList] = useState<FormRecord[]>([]);
   const [showFormModal, setShowFormModal] = useState(false);
-  const [formModalTab, setFormModalTab] = useState<"pick" | "choose" | "create" | "link">("pick");
+  const [formModalTab, setFormModalTab] = useState<"choose" | "create" | "link">("choose");
   const [formSearch, setFormSearch] = useState("");
   const [pickedFormId, setPickedFormId] = useState<string | null>(null);
   const [creatingForm, setCreatingForm] = useState(false);
@@ -189,6 +213,7 @@ export default function EventEditorPage({ params }: { params: Promise<{ id: stri
               ...data.event,
               links: data.event.links || [],
               persons: data.event.persons || [],
+              faq: data.event.faq || [],
               dates_json: data.event.dates_json || [],
               audience: data.event.audience || [],
             };
@@ -212,47 +237,6 @@ export default function EventEditorPage({ params }: { params: Promise<{ id: stri
     const t = setTimeout(() => setSavedFlash(false), 1600);
     return () => clearTimeout(t);
   }, [savedFlash]);
-
-  // Staggered entrance + scroll reveal + sticky bar state
-  useLayoutEffect(() => {
-    if (loading) return;
-    const root = rootRef.current;
-    if (!root) return;
-
-    const sentinel = sentinelRef.current;
-    const bar = barRef.current;
-    let stuckIo: IntersectionObserver | null = null;
-    if (sentinel && bar && "IntersectionObserver" in window) {
-      stuckIo = new IntersectionObserver(
-        ([e]) => bar.classList.toggle("is-stuck", !e.isIntersecting),
-        { threshold: 0 }
-      );
-      stuckIo.observe(sentinel);
-    }
-
-    const els = Array.from(root.querySelectorAll<HTMLElement>("[data-reveal]"));
-    if (!("IntersectionObserver" in window)) {
-      els.forEach((el) => el.classList.add("is-visible"));
-      return () => stuckIo?.disconnect();
-    }
-    root.classList.add("ev--reveal");
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-            io.unobserve(entry.target);
-          }
-        });
-      },
-      { rootMargin: "0px 0px -6% 0px", threshold: 0.06 }
-    );
-    els.forEach((el) => io.observe(el));
-    return () => {
-      io.disconnect();
-      stuckIo?.disconnect();
-    };
-  }, [loading]);
 
   const update = useCallback((patch: Partial<EventData>) => {
     setEvent((prev) => ({ ...prev, ...patch }));
@@ -294,36 +278,10 @@ export default function EventEditorPage({ params }: { params: Promise<{ id: stri
     };
   }, [event.slug, isNew, id]);
 
-  const uploadFile = useCallback(
-    async (file: File) => {
-      if (!file.type.startsWith("image/")) {
-        toast.error("Please choose an image file");
-        return;
-      }
-      setUploading(true);
-      try {
-        const formData = new FormData();
-        formData.append("file", file);
-        const res = await fetch("/api/upload", { method: "POST", body: formData });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error);
-        update({ cover_image: data.url, full_image: data.url });
-      } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "Upload failed");
-      }
-      setUploading(false);
-    },
-    [update]
-  );
-
-  const handleImageUpload = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) uploadFile(file);
-      e.target.value = "";
-    },
-    [uploadFile]
-  );
+  const openImageModal = useCallback((file?: File | null) => {
+    setInitialFile(file ?? null);
+    setShowImageModal(true);
+  }, []);
 
   const toggleAudience = useCallback(
     (a: string) => {
@@ -340,6 +298,26 @@ export default function EventEditorPage({ params }: { params: Promise<{ id: stri
       }
     },
     [event.audience, update]
+  );
+
+  const addFaq = useCallback(() => {
+    update({ faq: [...(event.faq || []), { question: "", answer: "" }] });
+  }, [event.faq, update]);
+
+  const updateFaq = useCallback(
+    (index: number, patch: Partial<FaqEntry>) => {
+      update({
+        faq: (event.faq || []).map((f, i) => (i === index ? { ...f, ...patch } : f)),
+      });
+    },
+    [event.faq, update]
+  );
+
+  const removeFaq = useCallback(
+    (index: number) => {
+      update({ faq: (event.faq || []).filter((_, i) => i !== index) });
+    },
+    [event.faq, update]
   );
 
   const addLink = useCallback(() => {
@@ -418,7 +396,7 @@ export default function EventEditorPage({ params }: { params: Promise<{ id: stri
     setFormSearch("");
     setExternalUrl("https://");
     setNewFormTitle(event.title ? `Register — ${event.title}` : "");
-    setFormModalTab("pick");
+    setFormModalTab("choose");
     setShowFormModal(true);
     loadForms();
   }, [event.title, loadForms]);
@@ -498,7 +476,7 @@ export default function EventEditorPage({ params }: { params: Promise<{ id: stri
           ...(dates.length ? deriveDateFields(dates) : {}),
           status: nextStatus,
           dates_json: dates,
-          faq: event.faq || [],
+          faq: (event.faq || []).filter((f) => f.question.trim() || f.answer.trim()),
           audience: event.audience || [],
           links: event.links || [],
           persons: event.persons || [],
@@ -590,9 +568,38 @@ export default function EventEditorPage({ params }: { params: Promise<{ id: stri
   }, [dirty, router]);
 
   if (loading) {
+    /* Skeleton shaped like the real editor — bar, cover card, sections and
+       rail — so nothing jumps when the event arrives. */
     return (
-      <div style={{ display: "flex", justifyContent: "center", padding: 80 }}>
-        <div className="spinner" />
+      <div className={s.skeleton} aria-busy="true" aria-label="Loading event">
+        <div className={s.skBar}>
+          <span className={s.sk} style={{ width: 38, height: 38, borderRadius: 11 }} />
+          <span className={s.sk} style={{ width: 170, height: 15, borderRadius: 7 }} />
+        </div>
+        <div className={s.layout}>
+          <div className={s.main}>
+            <div className={`${s.card} ${s.basics}`}>
+              <span className={`${s.sk} ${s.skCover}`} />
+              <span className={s.sk} style={{ width: "42%", height: 27, borderRadius: 8, marginTop: 20 }} />
+              <span className={s.sk} style={{ width: "68%", height: 14, borderRadius: 7, marginTop: 12 }} />
+            </div>
+            {[0, 1, 2].map((n) => (
+              <div className={s.card} key={n}>
+                <span className={s.sk} style={{ width: 150, height: 15, borderRadius: 7 }} />
+                <span className={s.sk} style={{ width: "100%", height: 58, borderRadius: 10, marginTop: 16 }} />
+              </div>
+            ))}
+          </div>
+          <aside className={s.side}>
+            {[0, 1, 2].map((n) => (
+              <div className={s.card} key={n}>
+                <span className={s.sk} style={{ width: "45%", height: 12, borderRadius: 6 }} />
+                <span className={s.sk} style={{ width: "100%", height: 36, borderRadius: 10, marginTop: 14 }} />
+                <span className={s.sk} style={{ width: "75%", height: 12, borderRadius: 6, marginTop: 12 }} />
+              </div>
+            ))}
+          </aside>
+        </div>
       </div>
     );
   }
@@ -618,9 +625,7 @@ export default function EventEditorPage({ params }: { params: Promise<{ id: stri
     { label: "URL slug", done: !!event.slug && slugAvailable },
   ];
   const pct = Math.round((checks.filter((c) => c.done).length / checks.length) * 100);
-  const RING_R = 27;
-  const RING_C = 2 * Math.PI * RING_R;
-  const ringOffset = RING_C - (pct / 100) * RING_C;
+  const doneCount = checks.filter((c) => c.done).length;
 
   const displayDate = nextDate
     ? new Date(nextDate + "T12:00:00").toLocaleDateString("en-AU", {
@@ -649,36 +654,43 @@ export default function EventEditorPage({ params }: { params: Promise<{ id: stri
       !formSearch.trim() || f.title.toLowerCase().includes(formSearch.trim().toLowerCase())
   );
 
-  return (
-    <div ref={rootRef}>
-      <div ref={sentinelRef} className="ev-sentinel" />
+  // Completeness ring geometry.
+  const RING_R = 18;
+  const RING_C = 2 * Math.PI * RING_R;
 
+  return (
+    <div>
       {/* Sticky action bar */}
-      <div ref={barRef} className="ev-bar">
-        <button className="ev-back" onClick={goBack} aria-label="Back to events">
+      <div className={s.bar}>
+        <button className={s.back} onClick={goBack} aria-label="Back to events">
           <ArrowLeft size={18} />
         </button>
-        <div className="ev-bar-mid">
-          <span className="ev-crumb">
-            Events / <strong>{isNew ? "New event" : event.title || "Edit event"}</strong>
-          </span>
-          <span className={`ev-dirty${dirty ? " on" : ""}`}>
-            <i /> Unsaved changes
-          </span>
+        <div className={s.crumb}>
+          <span className={s.crumbTop}>Events</span>
+          <h1 className={s.crumbTitle}>
+            {isNew ? "New event" : event.title || "Untitled event"}
+          </h1>
         </div>
-        <div className="ev-actions">
+        <span className={`${s.dirty}${dirty ? ` ${s.dirtyOn}` : ""}`}>
+          <i /> Unsaved changes
+        </span>
+        <div className={s.spacer} />
+        <div className={s.actions}>
           {!isNew && (
-            <button className="ev-btn-ghost" onClick={() => setDeleteConfirm(true)}>
+            <button
+              className={`${s.btn} ${s.btnGhost} ${s.btnDangerGhost} ${s.btnDelete}`}
+              onClick={() => setDeleteConfirm(true)}
+            >
               <Trash size={14} /> Delete
             </button>
           )}
           <button
-            className={`btn-secondary${savedFlash ? " ev-saved" : ""}`}
+            className={`${s.btn} ${s.btnSecondary}${savedFlash ? ` ${s.savedFlash}` : ""}`}
             onClick={() => handleSave()}
             disabled={saving || !event.title?.trim()}
           >
             {saving ? (
-              <SpinnerGap size={14} className="spin" />
+              <SpinnerGap size={14} className={s.spin} />
             ) : savedFlash ? (
               <Check size={14} />
             ) : (
@@ -687,720 +699,792 @@ export default function EventEditorPage({ params }: { params: Promise<{ id: stri
             {saving ? "Saving…" : savedFlash ? "Saved" : "Save Draft"}
           </button>
           <button
-            className="btn-primary"
+            className={`${s.btn} ${s.btnPrimary}`}
             onClick={() => handleSave("published")}
             disabled={saving || !event.title?.trim()}
           >
-            {saving ? <SpinnerGap size={14} className="spin" /> : <Eye size={14} />}
+            {saving ? <SpinnerGap size={14} className={s.spin} /> : <Eye size={14} />}
             {publishLabel}
           </button>
         </div>
       </div>
 
-      {/* Cover hero */}
-      <section
-        className={`ev-hero ev-in${heroImage ? "" : " no-cover"}${dragOver ? " is-drag" : ""}`}
-        style={{ animationDelay: "60ms" }}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={(e) => {
-          if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-          setDragOver(false);
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          const file = e.dataTransfer.files?.[0];
-          if (file) uploadFile(file);
-        }}
-      >
-        {uploading && <div className="ev-upload-bar" />}
-        {heroImage && (
-          <div className="ev-hero-img">
-            <img src={heroImage} alt="" />
-          </div>
-        )}
-        <div className="ev-hero-shade" />
-
-        <div className="ev-hero-bar">
-          <label className="ev-glass">
-            <UploadSimple size={17} />
-            {uploading
-              ? "Uploading…"
-              : heroImage
-                ? "Change image"
-                : "Upload or drag & drop image"}
-            <input type="file" accept="image/*" onChange={handleImageUpload} hidden />
-          </label>
-          {heroImage && !uploading && (
-            <button
-              className="ev-glass ev-glass--danger"
-              onClick={() => update({ cover_image: "", full_image: "" })}
+      <div className={s.layout}>
+        {/* ---------------- Main column ---------------- */}
+        <div className={s.main}>
+          {/* Cover + title */}
+          <section
+            className={`${s.card} ${s.basics}`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={(e) => {
+              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+              setDragOver(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              const file = e.dataTransfer.files?.[0];
+              if (file) openImageModal(file);
+            }}
+          >
+            <div
+              role="button"
+              tabIndex={0}
+              className={`${s.cover}${dragOver ? ` ${s.coverDrag}` : ""}`}
+              onClick={() => openImageModal(null)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openImageModal(null);
+                }
+              }}
+              aria-label={heroImage ? "Change event picture" : "Add event picture"}
             >
-              <X size={14} /> Remove
-            </button>
-          )}
-          <p className="ev-hero-hint">
-            Sets the cover and the full-size picture shown on the event page.
-            <br />
-            <strong>Highly recommended:</strong> 1920 &times; 1080 px (16:9) or larger, landscape,
-            under 2 MB &mdash; portrait images get cropped.
-          </p>
-        </div>
-
-        <div className="ev-aud">
-          <span className="ev-aud-label">Who is this for?</span>
-          {AUDIENCE_OPTIONS.map((a) => {
-            const active = (event.audience || []).includes(a);
-            return (
-              <button
-                key={a}
-                className={`ev-pill${active ? " on" : ""}`}
-                onClick={() => toggleAudience(a)}
-              >
-                <i style={{ background: AUDIENCE_COLORS[a] || "#4ade80" }} />
-                {a}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="ev-hero-fields">
-          <input
-            className="ev-title-input"
-            value={event.title || ""}
-            onChange={(e) => handleTitleChange(e.target.value)}
-            placeholder="Enter the title"
-            aria-label="Event title"
-          />
-          <input
-            className="ev-sub-input"
-            value={event.description || ""}
-            onChange={(e) => update({ description: e.target.value.slice(0, 200) })}
-            placeholder="One-line summary shown on event cards and listings…"
-            aria-label="Event summary"
-          />
-          <div className="ev-title-meta">
-            <span>{isNew ? "Draft — not yet published" : `Status: ${event.status}`}</span>
-            <span>{(event.description || "").length} / 200</span>
-          </div>
-        </div>
-      </section>
-
-      {/* Two-column content */}
-      <div className="ev-grid">
-        {/* Left column */}
-        <div>
-          {/* 01 About */}
-          <section className="ev-sec" data-reveal>
-            <div className="ev-sec-head">
-              <span className="ev-sec-num">01</span>
-              <span className="ev-sec-title">About the event</span>
-              <span className="ev-sec-rule" />
+              {heroImage ? (
+                <>
+                  <img src={heroImage} alt="" className={s.coverImg} />
+                  <div className={s.coverShade}>
+                    <span className={s.glassBtn}>
+                      <UploadSimple size={14} /> Change picture
+                    </span>
+                    <button
+                      className={`${s.glassBtn} ${s.glassDanger}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        update({ cover_image: "", full_image: "" });
+                      }}
+                    >
+                      <X size={14} /> Remove
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className={s.coverEmpty}>
+                  <span className={s.coverEmptyIcon}>
+                    <ImageIcon size={24} weight="duotone" />
+                  </span>
+                  <span className={s.coverEmptyTitle}>Add a cover picture</span>
+                  <span className={s.coverEmptySub}>
+                    Tap to upload or drag &amp; drop — AI converts it to 16:9 landscape
+                  </span>
+                </div>
+              )}
             </div>
+
+            <input
+              className={s.titleInput}
+              value={event.title || ""}
+              onChange={(e) => handleTitleChange(e.target.value)}
+              placeholder="Event title"
+              aria-label="Event title"
+            />
+            <textarea
+              className={s.summaryInput}
+              rows={2}
+              value={event.description || ""}
+              onChange={(e) => update({ description: e.target.value.slice(0, 200) })}
+              placeholder="One-line summary shown on event cards and listings…"
+              aria-label="Event summary"
+            />
+
+            <div className={s.audWrap}>
+              <span className={s.audLabel}>Who is this for?</span>
+              {AUDIENCE_OPTIONS.map((a) => {
+                const active = (event.audience || []).includes(a);
+                return (
+                  <button
+                    key={a}
+                    type="button"
+                    aria-pressed={active}
+                    className={`${s.pill}${active ? ` ${s.pillOn}` : ""}`}
+                    onClick={() => toggleAudience(a)}
+                  >
+                    <i style={{ background: AUDIENCE_COLORS[a] || "#4ade80" }} />
+                    {a}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className={s.metaRow}>
+              <span
+                className={`badge${event.status === "published" ? "" : " badge--muted"}`}
+              >
+                {event.status === "published" ? "Published" : "Draft"}
+              </span>
+              <span className={s.metaDot} />
+              <CalendarDots size={14} />
+              <span>{displayDate || "No date set yet"}</span>
+              {untilPhrase && (
+                <>
+                  <span className={s.metaDot} />
+                  <span>
+                    {untilPhrase === "Today" ? "Today" : `In ${untilPhrase}`}
+                  </span>
+                </>
+              )}
+              {(event.description || "").length >= 120 && (
+                <span className={s.metaCount}>
+                  {(event.description || "").length} / 200
+                </span>
+              )}
+            </div>
+          </section>
+
+          {/* About */}
+          <Section icon={<NotePencil size={17} weight="duotone" />} title="About the event">
             <RichTextEditor
               value={event.content_html || ""}
               onChange={(html) => update({ content_html: html })}
               placeholder="Write about this event..."
             />
-          </section>
+          </Section>
 
-          {/* 02 Dates */}
-          <section className="ev-sec" data-reveal>
-            <div className="ev-sec-head">
-              <span className="ev-sec-num">02</span>
-              <span className="ev-sec-title">Dates &amp; Times</span>
-              <span className="ev-sec-rule" />
-            </div>
+          {/* Dates */}
+          <Section
+            icon={<Clock size={17} weight="duotone" />}
+            title="Dates & Times"
+            hint={`${(event.dates_json || []).length} date${
+              (event.dates_json || []).length === 1 ? "" : "s"
+            }`}
+          >
             <DateEditor
               dates={event.dates_json || []}
               onChange={(dates) =>
                 update({ ...deriveDateFields(dates), dates_json: dates })
               }
             />
-          </section>
+          </Section>
 
-          {/* 03 Location */}
-          <section className="ev-sec" data-reveal>
-            <div className="ev-sec-head">
-              <span className="ev-sec-num">03</span>
-              <span className="ev-sec-title">Location</span>
-              <span className="ev-sec-rule" />
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <MapPin size={20} weight="duotone" color="var(--color-muted)" />
-              <input
-                className="ev-input"
-                value={event.location || ""}
-                onChange={(e) => update({ location: e.target.value })}
-                placeholder="Masjid As Sunnah, Lakemba"
-              />
-            </div>
+          {/* Location */}
+          <Section icon={<MapPin size={17} weight="duotone" />} title="Location">
+            <input
+              className={s.input}
+              value={event.location || ""}
+              onChange={(e) => update({ location: e.target.value })}
+              placeholder="Masjid As Sunnah, Lakemba"
+              aria-label="Event location"
+            />
             {event.location && (
-              <div className="ev-map" style={{ marginTop: 14 }}>
+              <div className={s.map}>
                 <iframe
                   src={`https://www.google.com/maps?q=${encodeURIComponent(event.location)}&output=embed`}
-                  width="100%"
-                  height={190}
-                  style={{ border: 0, display: "block" }}
+                  title="Event location map"
                   loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"
                 />
               </div>
             )}
-          </section>
+          </Section>
+
+          {/* FAQ */}
+          <Section
+            icon={<Question size={17} weight="duotone" />}
+            title="FAQ"
+            hint="Optional"
+          >
+            <div className={s.stack}>
+              {(event.faq || []).map((f, i) => (
+                <div key={i} className={s.faqItem}>
+                  <div className={s.faqTop}>
+                    <input
+                      className={s.input}
+                      value={f.question}
+                      onChange={(e) => updateFaq(i, { question: e.target.value })}
+                      placeholder="Question (e.g. Do I need to bring anything?)"
+                      aria-label="FAQ question"
+                    />
+                    <button
+                      className={s.rowX}
+                      onClick={() => removeFaq(i)}
+                      aria-label="Remove question"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <textarea
+                    className={`${s.input} ${s.textarea}`}
+                    value={f.answer}
+                    onChange={(e) => updateFaq(i, { answer: e.target.value })}
+                    placeholder="Answer"
+                    aria-label="FAQ answer"
+                  />
+                </div>
+              ))}
+              <button className={s.addBtn} onClick={addFaq}>
+                <Plus size={15} /> Add question
+              </button>
+              {(event.faq || []).length === 0 && (
+                <p className={s.empty}>
+                  Answers show as an FAQ list on the public event page.
+                </p>
+              )}
+            </div>
+          </Section>
+
+          {/* Links & people */}
+          <Section
+            icon={<UsersThree size={17} weight="duotone" />}
+            title="Links & people"
+          >
+            <div className={s.stack}>
+              {(event.links || []).map((link, i) => (
+                <div className={s.row} key={`${link.url}-${i}`}>
+                  <LinkIcon size={15} className={s.rowIcon} />
+                  <div className={s.rowMain}>
+                    <div className={s.rowTitle}>{link.label || link.url}</div>
+                    {link.label && <div className={s.rowSub}>{link.url}</div>}
+                  </div>
+                  <button
+                    className={s.rowX}
+                    onClick={() => removeLink(i)}
+                    aria-label="Remove link"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+              {(event.persons || []).map((p, i) => (
+                <div className={s.row} key={`${p.name}-${i}`}>
+                  <User size={15} className={s.rowIcon} />
+                  <div className={s.rowMain}>
+                    <div className={s.rowTitle}>{p.name}</div>
+                    {p.role && <div className={s.rowSub}>{p.role}</div>}
+                  </div>
+                  <button
+                    className={s.rowX}
+                    onClick={() => removePerson(i)}
+                    aria-label="Remove person"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+
+              {showLinkForm && (
+                <div className={s.miniForm}>
+                  <input
+                    className={s.input}
+                    value={newLink.label}
+                    onChange={(e) => setNewLink((l) => ({ ...l, label: e.target.value }))}
+                    placeholder="Label (e.g. Register)"
+                    aria-label="Link label"
+                  />
+                  <input
+                    className={s.input}
+                    value={newLink.url}
+                    onChange={(e) => setNewLink((l) => ({ ...l, url: e.target.value }))}
+                    placeholder="https://..."
+                    onKeyDown={(e) => e.key === "Enter" && addLink()}
+                    aria-label="Link URL"
+                  />
+                  <div className={s.miniActions}>
+                    <button className={s.miniAdd} onClick={addLink} disabled={!newLink.url.trim()}>
+                      Add link
+                    </button>
+                    <button
+                      className={s.miniCancel}
+                      onClick={() => {
+                        setShowLinkForm(false);
+                        setNewLink({ label: "", url: "" });
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {showPersonForm && (
+                <div className={s.miniForm}>
+                  <input
+                    className={s.input}
+                    value={newPerson.name}
+                    onChange={(e) => setNewPerson((p) => ({ ...p, name: e.target.value }))}
+                    placeholder="Name"
+                    aria-label="Person name"
+                  />
+                  <input
+                    className={s.input}
+                    value={newPerson.role}
+                    onChange={(e) => setNewPerson((p) => ({ ...p, role: e.target.value }))}
+                    placeholder="Role (e.g. Speaker)"
+                    onKeyDown={(e) => e.key === "Enter" && addPerson()}
+                    aria-label="Person role"
+                  />
+                  <div className={s.miniActions}>
+                    <button className={s.miniAdd} onClick={addPerson} disabled={!newPerson.name.trim()}>
+                      Add person
+                    </button>
+                    <button
+                      className={s.miniCancel}
+                      onClick={() => {
+                        setShowPersonForm(false);
+                        setNewPerson({ name: "", role: "" });
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {(!showLinkForm || !showPersonForm) && (
+                <div className={s.addRow}>
+                  {!showLinkForm && (
+                    <button
+                      className={s.addBtn}
+                      onClick={() => setShowLinkForm(true)}
+                    >
+                      <LinkIcon size={15} /> Add link
+                    </button>
+                  )}
+                  {!showPersonForm && (
+                    <button
+                      className={s.addBtn}
+                      onClick={() => setShowPersonForm(true)}
+                    >
+                      <User size={15} /> Add person
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {(event.links || []).length === 0 &&
+                (event.persons || []).length === 0 &&
+                !showLinkForm &&
+                !showPersonForm && (
+                  <p className={s.empty}>No links or people added yet.</p>
+                )}
+            </div>
+          </Section>
         </div>
 
-        {/* Right column */}
-        <aside className="ev-side ev-in" style={{ animationDelay: "220ms" }}>
-          {/* Live preview */}
-          <div className="ev-card ev-card--dark" data-reveal>
-            <div className="ev-card-title">
-              Live preview
-              <div className="ev-ring" title={`${pct}% complete`}>
-                <svg width="64" height="64" viewBox="0 0 64 64">
-                  <circle className="ev-ring-bg" cx="32" cy="32" r={RING_R} fill="none" strokeWidth="5" />
-                  <circle
-                    className="ev-ring-fg"
-                    cx="32"
-                    cy="32"
-                    r={RING_R}
-                    fill="none"
-                    strokeWidth="5"
-                    strokeDasharray={RING_C}
-                    strokeDashoffset={ringOffset}
-                  />
-                </svg>
-                <span className="ev-ring-num">{pct}%</span>
+        {/* ---------------- Sidebar ---------------- */}
+        <aside className={s.side}>
+          {/* Publish / status */}
+          <div className={`${s.card} ${s.cardDark}`}>
+            <div className={s.sideRow}>
+              <span className={s.sideLabel}>Status</span>
+              <div className={s.seg} role="group" aria-label="Event status">
+                {(["draft", "published"] as const).map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    aria-pressed={event.status === st}
+                    onClick={() => update({ status: st })}
+                    className={`${s.segBtn}${
+                      event.status === st
+                        ? st === "published"
+                          ? ` ${s.segOnPub}`
+                          : ` ${s.segOn}`
+                        : ""
+                    }`}
+                  >
+                    {st}
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div className="ev-preview">
+            <div className={s.divider} />
+
+            <div className={s.sideRow}>
+              <span className={s.sideLabel}>URL slug</span>
+              <div className={s.slugRow}>
+                <span className={s.slugPrefix}>/events/</span>
+                <input
+                  className={s.slugInput}
+                  value={event.slug || ""}
+                  onChange={(e) =>
+                    update({ slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })
+                  }
+                  placeholder="event-url"
+                  aria-label="Event URL slug"
+                />
+              </div>
               <div
-                className="ev-preview-top"
-                style={event.cover_image ? { backgroundImage: `url(${event.cover_image})` } : undefined}
-              />
-              <div className="ev-preview-body">
-                <div className={`ev-preview-title${event.title ? "" : " is-empty"}`}>
-                  {event.title || "Untitled event"}
-                </div>
-                <div className="ev-preview-meta">
-                  <CalendarDots size={13} weight="duotone" />
-                  {displayDate || "No date set"}
-                </div>
-                {(event.audience || []).length > 0 && (
-                  <div className="ev-preview-chips">
-                    {(event.audience || []).map((a) => (
-                      <span key={a} className="ev-chip">
-                        {a}
-                      </span>
-                    ))}
-                    {event.cost && <span className="ev-chip">{event.cost}</span>}
-                  </div>
+                className={`${s.slugState}${
+                  checkingSlug ? "" : slugAvailable ? ` ${s.slugOk}` : ` ${s.slugBad}`
+                }`}
+              >
+                {checkingSlug ? (
+                  <>
+                    <SpinnerGap size={12} className={s.spin} /> Checking availability…
+                  </>
+                ) : slugAvailable ? (
+                  <>
+                    <Check size={12} /> URL is available
+                  </>
+                ) : (
+                  <>
+                    <X size={12} /> This URL is already taken
+                  </>
                 )}
               </div>
+              {!isNew && event.slug && (
+                <a
+                  className={s.viewLink}
+                  href={`${SITE_URL}/events/${event.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Eye size={14} /> View on website
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Details + registration */}
+          <div className={`${s.card} ${s.cardDark}`}>
+            <div className={s.nextDateVal}>{displayDate || "No date set"}</div>
+            <div className={s.nextDateSub}>
+              {untilPhrase
+                ? untilPhrase === "Today"
+                  ? "Happening today"
+                  : `Starts in ${untilPhrase}`
+                : "Add a date to see the countdown"}
             </div>
 
-            <div className="ev-checks">
+            <div className={s.divider} />
+
+            <div className={s.sideMeta}>
+              <MapPin size={15} weight="duotone" className={s.sideMetaIcon} />
+              {event.location || "No location set"}
+            </div>
+
+            <div className={s.divider} />
+
+            <div className={s.sideRow}>
+              <span className={s.sideLabel}>Cost</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <CurrencyDollar
+                  size={16}
+                  style={{ color: "rgb(255 255 255 / 0.55)", flex: "none" }}
+                />
+                <input
+                  className={`${s.input} ${s.inputDark}`}
+                  value={event.cost || ""}
+                  onChange={(e) => update({ cost: e.target.value })}
+                  placeholder="Free"
+                  aria-label="Event cost"
+                />
+              </div>
+            </div>
+
+            <div className={s.divider} />
+
+            <div className={s.sideRow}>
+              <span className={s.sideLabel}>Registration</span>
+              {event.form_id ? (
+                <div className={s.regChip}>
+                  <div className={s.regMain}>
+                    <div className={s.regTitle}>
+                      {attachedForm ? attachedForm.title : "Attached form"}
+                    </div>
+                    <div className={s.regSub}>
+                      {attachedForm
+                        ? `${attachedForm.status === "published" ? "Live" : "Draft"} · ${
+                            attachedForm.fields?.length || 0
+                          } questions`
+                        : "Form may have been deleted"}
+                    </div>
+                  </div>
+                  <div className={s.regActions}>
+                    {attachedForm && (
+                      <>
+                        <a
+                          className={s.chipBtn}
+                          href={`/dashboard/register/${attachedForm.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open in builder"
+                        >
+                          <ArrowSquareOut size={14} />
+                        </a>
+                        <a
+                          className={s.chipBtn}
+                          href={`/f/${attachedForm.slug}?preview=1`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Preview form"
+                        >
+                          <Eye size={14} />
+                        </a>
+                      </>
+                    )}
+                    <button
+                      className={`${s.chipBtn} ${s.chipBtnDanger}`}
+                      title="Detach form"
+                      onClick={() =>
+                        persistFormId(null).then((ok) => ok && toast.success("Form detached"))
+                      }
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+              ) : event.register_url ? (
+                <div className={s.regChip}>
+                  <div className={s.regMain}>
+                    <div className={s.regTitle}>External registration</div>
+                    <div className={s.regSub}>{event.register_url}</div>
+                  </div>
+                  <div className={s.regActions}>
+                    <a
+                      className={s.chipBtn}
+                      href={event.register_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open link"
+                    >
+                      <ArrowSquareOut size={14} />
+                    </a>
+                    <button
+                      className={`${s.chipBtn} ${s.chipBtnDanger}`}
+                      title="Remove link"
+                      onClick={() =>
+                        persistRegisterUrl("").then((ok) => ok && toast.success("Link removed"))
+                      }
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className={s.hint} style={{ textAlign: "left" }}>
+                  Attach a built-in form or link to an external one so people can sign up.
+                </p>
+              )}
+              <button className={s.addBtn} onClick={openFormModal}>
+                <Plus size={15} />{" "}
+                {event.form_id || event.register_url ? "Change" : "Add registration"}
+              </button>
+            </div>
+          </div>
+
+          {/* Completeness */}
+          <div className={`${s.card} ${s.cardDark}`}>
+            <div className={s.checksHead}>
+              <span className={s.checksLabel}>Completeness</span>
+              <div className={s.ringWrap}>
+                <svg width="46" height="46" viewBox="0 0 46 46" aria-hidden="true">
+                  <circle
+                    cx="23"
+                    cy="23"
+                    r={RING_R}
+                    fill="none"
+                    stroke="rgb(255 255 255 / 0.12)"
+                    strokeWidth="4"
+                  />
+                  <circle
+                    cx="23"
+                    cy="23"
+                    r={RING_R}
+                    fill="none"
+                    stroke="var(--color-gold)"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeDasharray={RING_C}
+                    strokeDashoffset={RING_C * (1 - pct / 100)}
+                    transform="rotate(-90 23 23)"
+                    style={{ transition: "stroke-dashoffset 0.4s ease" }}
+                  />
+                </svg>
+                <span className={s.ringNum}>{pct}%</span>
+              </div>
+            </div>
+            <div className={s.checkGrid}>
               {checks.map((c) => (
-                <span key={c.label} className={`ev-check${c.done ? " on" : ""}`}>
-                  <i>{c.done ? "✓" : ""}</i>
+                <span key={c.label} className={`${s.check}${c.done ? ` ${s.checkOn}` : ""}`}>
+                  <i>{c.done ? <Check size={9} weight="bold" /> : null}</i>
                   {c.label}
                 </span>
               ))}
             </div>
-
-            <div className="ev-nextdate">
-              <div className="ev-nextdate-label">Next date</div>
-              <div className="ev-nextdate-value">{displayDate || "Show upcoming date"}</div>
-              <div className="ev-nextdate-sub">
-                {untilPhrase !== null
-                  ? untilPhrase === "Today"
-                    ? "Today"
-                    : `In ${untilPhrase}`
-                  : "Add a date to count down"}
-              </div>
+            <div className={s.divider} />
+            <div className={s.hint}>
+              {doneCount} of {checks.length} complete · Ctrl / ⌘ + S to save
             </div>
-          </div>
-
-          {/* Registration form */}
-          <div className="ev-card ev-card--dark" data-reveal>
-            <div className="ev-card-title">
-              Registration
-              {attachedForm && (
-                <span className="ev-form-badge">{attachedForm.fields?.length || 0} questions</span>
-              )}
-            </div>
-
-            {event.form_id ? (
-              <div className="ev-form-chip">
-                <div className="ev-form-chip-main">
-                  <strong>{attachedForm ? attachedForm.title : "Attached form"}</strong>
-                  <span>
-                    {attachedForm
-                      ? `${attachedForm.status === "published" ? "Live" : "Draft"} · /f/${attachedForm.slug}`
-                      : "Link saved — form may have been deleted"}
-                  </span>
-                </div>
-                <div className="ev-form-chip-actions">
-                  {attachedForm && (
-                    <>
-                      <a
-                        className="ev-chip-btn"
-                        href={`/dashboard/register/${attachedForm.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Open in builder"
-                      >
-                        <ArrowSquareOut size={14} />
-                      </a>
-                      <a
-                        className="ev-chip-btn"
-                        href={`/f/${attachedForm.slug}?preview=1`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Preview form"
-                      >
-                        <Eye size={14} />
-                      </a>
-                    </>
-                  )}
-                  <button
-                    className="ev-chip-btn danger"
-                    title="Detach form"
-                    onClick={() =>
-                      persistFormId(null).then((ok) => ok && toast.success("Form detached"))
-                    }
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              </div>
-            ) : event.register_url ? (
-              <div className="ev-form-chip">
-                <div className="ev-form-chip-main">
-                  <strong>External registration</strong>
-                  <span>{event.register_url}</span>
-                </div>
-                <div className="ev-form-chip-actions">
-                  <a
-                    className="ev-chip-btn"
-                    href={event.register_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Open link"
-                  >
-                    <ArrowSquareOut size={14} />
-                  </a>
-                  <button
-                    className="ev-chip-btn danger"
-                    title="Remove link"
-                    onClick={() =>
-                      persistRegisterUrl("").then((ok) => ok && toast.success("Link removed"))
-                    }
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <p className="ev-form-none">
-                Attach a built-in registration form or link to an external one so people
-                can sign up for this event.
-              </p>
-            )}
-
-            <button className="ev-toggle" style={{ marginTop: 12 }} onClick={openFormModal}>
-              <Plus size={15} />{" "}
-              {event.form_id || event.register_url ? "Change registration" : "Add registration"}
-            </button>
-          </div>
-
-          {/* Details: cost, URL, status */}
-          <div className="ev-card ev-card--dark" data-reveal>
-            <div className="ev-card-title">Details</div>
-
-            <div className="ev-field-label" style={{ color: "rgba(255,255,255,0.45)" }}>
-              Cost
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
-              <CurrencyDollar size={16} color="rgba(255,255,255,0.55)" />
-              <input
-                className="ev-input-dark"
-                value={event.cost || ""}
-                onChange={(e) => update({ cost: e.target.value })}
-                placeholder="Free"
-              />
-            </div>
-
-            <div className="ev-field-label" style={{ color: "rgba(255,255,255,0.45)" }}>
-              URL slug
-            </div>
-            <div className="ev-input-row">
-              <span>/events/</span>
-              <input
-                value={event.slug || ""}
-                onChange={(e) => update({ slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })}
-                placeholder="event-url"
-                aria-label="Event URL slug"
-              />
-            </div>
-            <div
-              className={`ev-slug-state${checkingSlug ? " checking" : slugAvailable ? " ok" : ""}`}
-            >
-              {checkingSlug ? (
-                <>
-                  <SpinnerGap size={12} className="spin" /> Checking availability…
-                </>
-              ) : slugAvailable ? (
-                <>
-                  <Check size={12} /> URL is available
-                </>
-              ) : (
-                <>
-                  <X size={12} /> This URL is already taken
-                </>
-              )}
-            </div>
-
-            <div className="ev-field-label" style={{ color: "rgba(255,255,255,0.45)", marginTop: 18 }}>
-              Status
-            </div>
-            <div className="ev-seg">
-              {(["draft", "published"] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => update({ status: s })}
-                  className={
-                    event.status === s ? (s === "published" ? "on-published" : "on-draft") : ""
-                  }
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-
-            {!isNew && event.slug && (
-              <a
-                className="ev-view"
-                href={`${SITE_URL}/events/${event.slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Eye size={14} /> View on website
-              </a>
-            )}
-
-            <div className="ev-hint">Shortcut: Ctrl / ⌘ + S to save</div>
-          </div>
-
-          {/* Links & people */}
-          <div className="ev-card" data-reveal>
-            <div className="ev-card-title">Links &amp; people</div>
-
-            <button
-              className={`ev-toggle${showLinkForm ? " on" : ""}`}
-              onClick={() => setShowLinkForm(!showLinkForm)}
-            >
-              <LinkIcon size={15} /> {showLinkForm ? "Close" : "Add link"}
-            </button>
-
-            {showLinkForm && (
-              <div className="ev-mini-form">
-                <input
-                  className="ev-input"
-                  value={newLink.label}
-                  onChange={(e) => setNewLink((l) => ({ ...l, label: e.target.value }))}
-                  placeholder="Label (e.g. Register)"
-                />
-                <input
-                  className="ev-input"
-                  value={newLink.url}
-                  onChange={(e) => setNewLink((l) => ({ ...l, url: e.target.value }))}
-                  placeholder="https://..."
-                  onKeyDown={(e) => e.key === "Enter" && addLink()}
-                />
-                <div className="ev-mini-actions">
-                  <button className="ev-add" onClick={addLink} disabled={!newLink.url.trim()}>
-                    Add link
-                  </button>
-                  <button
-                    className="ev-cancel"
-                    onClick={() => {
-                      setShowLinkForm(false);
-                      setNewLink({ label: "", url: "" });
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {(event.links || []).map((link, i) => (
-              <div className="ev-row" key={`${link.url}-${i}`}>
-                <LinkIcon size={15} color="var(--color-gold-deep)" />
-                <div className="ev-row-main">
-                  <div className="ev-row-title">{link.label || link.url}</div>
-                  {link.label && <div className="ev-row-sub">{link.url}</div>}
-                </div>
-                <button className="ev-row-x" onClick={() => removeLink(i)} aria-label="Remove link">
-                  <X size={13} />
-                </button>
-              </div>
-            ))}
-
-            <button
-              className={`ev-toggle${showPersonForm ? " on" : ""}`}
-              style={{ marginTop: 14 }}
-              onClick={() => setShowPersonForm(!showPersonForm)}
-            >
-              <User size={15} /> {showPersonForm ? "Close" : "Add person"}
-            </button>
-
-            {showPersonForm && (
-              <div className="ev-mini-form">
-                <input
-                  className="ev-input"
-                  value={newPerson.name}
-                  onChange={(e) => setNewPerson((p) => ({ ...p, name: e.target.value }))}
-                  placeholder="Name"
-                />
-                <input
-                  className="ev-input"
-                  value={newPerson.role}
-                  onChange={(e) => setNewPerson((p) => ({ ...p, role: e.target.value }))}
-                  placeholder="Role (e.g. Speaker)"
-                  onKeyDown={(e) => e.key === "Enter" && addPerson()}
-                />
-                <div className="ev-mini-actions">
-                  <button className="ev-add" onClick={addPerson} disabled={!newPerson.name.trim()}>
-                    Add person
-                  </button>
-                  <button
-                    className="ev-cancel"
-                    onClick={() => {
-                      setShowPersonForm(false);
-                      setNewPerson({ name: "", role: "" });
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {(event.persons || []).map((person, i) => (
-              <div className="ev-row" key={`${person.name}-${i}`}>
-                <User size={15} color="var(--color-gold-deep)" />
-                <div className="ev-row-main">
-                  <div className="ev-row-title">{person.name}</div>
-                  {person.role && <div className="ev-row-sub">{person.role}</div>}
-                </div>
-                <button className="ev-row-x" onClick={() => removePerson(i)} aria-label="Remove person">
-                  <X size={13} />
-                </button>
-              </div>
-            ))}
-
-            {(event.links || []).length === 0 && (event.persons || []).length === 0 && !showLinkForm && !showPersonForm && (
-              <p className="ev-empty">No links or people added yet.</p>
-            )}
           </div>
         </aside>
       </div>
 
+      {/* Image flow modal */}
+      {showImageModal && (
+        <ImageFlowModal
+          open={showImageModal}
+          initialFile={initialFile}
+          onClose={() => {
+            setShowImageModal(false);
+            setInitialFile(null);
+          }}
+          onDone={(url) => update({ cover_image: url, full_image: url })}
+        />
+      )}
+
       {/* Add / change registration form */}
       {showFormModal && (
-        <div className="ev-overlay" onClick={() => setShowFormModal(false)}>
-          <div className="ev-modal ev-modal--wide" onClick={(e) => e.stopPropagation()}>
-            <div className="fm-modal-head">
+        <div className={s.overlay} onClick={() => setShowFormModal(false)}>
+          <div className={`${s.modal} ${s.modalWide}`} onClick={(e) => e.stopPropagation()}>
+            <div className={s.modalHead}>
               <div>
-                <div className="fm-modal-eyebrow">Registration</div>
-                <div className="ev-modal-title fm-modal-title">
-                  {event.form_id || event.register_url
-                    ? "Change registration"
-                    : "Add registration"}
+                <div className={s.modalEyebrow}>Registration</div>
+                <div className={s.modalHeading}>
+                  {event.form_id || event.register_url ? "Change registration" : "Add registration"}
                 </div>
               </div>
-              <button
-                className="ev-row-x"
-                onClick={() => setShowFormModal(false)}
-                aria-label="Close"
-              >
+              <button className={s.rowX} onClick={() => setShowFormModal(false)} aria-label="Close">
                 <X size={16} />
               </button>
             </div>
 
-            {formModalTab !== "pick" && (
-              <div className="fm-modal-tabs">
-                <button
-                  className={`fm-modal-tab${formModalTab === "choose" ? " on" : ""}`}
-                  onClick={() => setFormModalTab("choose")}
-                >
-                  Built-in form
-                </button>
-                <button
-                  className={`fm-modal-tab${formModalTab === "create" ? " on" : ""}`}
-                  onClick={() => setFormModalTab("create")}
-                >
-                  Create new
-                </button>
-                <button
-                  className={`fm-modal-tab${formModalTab === "link" ? " on" : ""}`}
-                  onClick={() => setFormModalTab("link")}
-                >
-                  External link
-                </button>
-              </div>
-            )}
-
-            {formModalTab === "pick" && (
-              <div className="fm-modal-body">
-                <div className="fm-type-list">
-                  <button className="fm-type" onClick={() => setFormModalTab("choose")}>
-                    <span className="fm-type-icon">
-                      <NotePencil size={22} weight="duotone" />
-                    </span>
-                    <strong>Built-in form</strong>
-                    <span className="fm-type-desc">
-                      Build a registration form on this site, or pick one you already made.
-                    </span>
-                  </button>
-                  <button className="fm-type" onClick={() => setFormModalTab("link")}>
-                    <span className="fm-type-icon">
-                      <LinkSimple size={22} weight="duotone" />
-                    </span>
-                    <strong>Link to another site</strong>
-                    <span className="fm-type-desc">
-                      Send people to an external page such as Google Forms or Eventbrite.
-                    </span>
-                  </button>
-                </div>
-                {event.form_id ? (
-                  <p className="fm-modal-hint">A built-in form is currently attached.</p>
-                ) : event.register_url ? (
-                  <p className="fm-modal-hint">Current link: {event.register_url}</p>
-                ) : null}
-              </div>
-            )}
-
-            {formModalTab === "link" && (
-              <div className="fm-modal-body">
-                <label className="fb-field-label">Registration link</label>
-                <input
-                  className="ev-input"
-                  value={externalUrl}
-                  onChange={(e) => setExternalUrl(e.target.value)}
-                  placeholder="https://"
-                  autoFocus
-                />
-                <div className="fm-modal-actions-row">
-                  <button className="btn-primary" onClick={saveExternalUrl}>
-                    <Check size={15} /> Save link
-                  </button>
-                  <button className="ev-cancel" onClick={() => setFormModalTab("pick")}>
-                    Back
-                  </button>
-                </div>
-                <p className="fm-modal-hint">
-                  The Register now button on the website opens this link in a new tab.
-                </p>
-              </div>
-            )}
+            <div className={s.modalTabs}>
+              <button
+                className={`${s.modalTab}${formModalTab === "choose" ? ` ${s.modalTabOn}` : ""}`}
+                onClick={() => setFormModalTab("choose")}
+              >
+                Built-in form
+              </button>
+              <button
+                className={`${s.modalTab}${formModalTab === "create" ? ` ${s.modalTabOn}` : ""}`}
+                onClick={() => setFormModalTab("create")}
+              >
+                Create new
+              </button>
+              <button
+                className={`${s.modalTab}${formModalTab === "link" ? ` ${s.modalTabOn}` : ""}`}
+                onClick={() => setFormModalTab("link")}
+              >
+                External link
+              </button>
+            </div>
 
             {formModalTab === "choose" && (
-              <div className="fm-modal-body">
-                <div className="fm-search">
+              <>
+                <div className={s.searchRow}>
                   <MagnifyingGlass size={15} />
                   <input
+                    className={s.searchInput}
                     value={formSearch}
                     onChange={(e) => setFormSearch(e.target.value)}
                     placeholder="Search your forms…"
                     aria-label="Search forms"
                   />
                 </div>
-
-                <div className="fm-pick-list">
+                <div className={s.pickList}>
                   {filteredForms.length === 0 ? (
-                    <p className="fm-pick-empty">
+                    <p className={s.empty}>
                       {formsList.length === 0
-                        ? "You have no forms yet — create one in the next tab."
+                        ? "You have no forms yet — create one in the “Create new” tab."
                         : "No forms match that search."}
                     </p>
                   ) : (
                     filteredForms.map((f) => (
                       <button
                         key={f.id}
-                        className={`fm-pick${pickedFormId === f.id ? " on" : ""}`}
+                        className={`${s.pick}${pickedFormId === f.id ? ` ${s.pickOn}` : ""}`}
                         onClick={() => setPickedFormId(f.id)}
                       >
-                        <span className="fm-pick-radio" />
-                        <span className="fm-pick-main">
-                          <strong>{f.title}</strong>
-                          <span>
-                            {f.fields?.length || 0} question{f.fields?.length === 1 ? "" : "s"} ·{" "}
-                            {f.status}
+                        <span className={s.radio} />
+                        <span className={s.pickMain}>
+                          <span className={s.pickTitle}>{f.title}</span>
+                          <span className={s.pickSub}>
+                            {f.fields?.length || 0} question
+                            {f.fields?.length === 1 ? "" : "s"} · {f.status}
                           </span>
                         </span>
-                        <span className="fm-pick-count">{f.response_count || 0} resp.</span>
+                        <span className={s.pickCount}>{f.response_count || 0} resp.</span>
                       </button>
                     ))
                   )}
                 </div>
-
-                <div className="fm-modal-actions-row">
+                <div className={s.modalRowActions}>
                   <button
-                    className="btn-primary"
+                    className={`${s.btn} ${s.btnPrimary}`}
                     onClick={attachPickedForm}
                     disabled={!pickedFormId}
                   >
                     <Check size={15} /> Attach form
                   </button>
-                  <button className="ev-cancel" onClick={() => setFormModalTab("create")}>
+                  <button className={s.modalCancel} onClick={() => setFormModalTab("create")}>
                     <Plus size={14} /> New form instead
                   </button>
-                  <button className="ev-cancel" onClick={() => setFormModalTab("link")}>
-                    <LinkSimple size={14} /> Use external link
+                  <button className={s.modalCancel} onClick={() => setFormModalTab("link")}>
+                    <LinkSimple size={14} /> External link
                   </button>
                 </div>
-              </div>
+              </>
+            )}
+
+            {formModalTab === "link" && (
+              <>
+                <div className={s.field}>
+                  <label className={s.label} htmlFor="ext-url">
+                    Registration link
+                  </label>
+                  <input
+                    id="ext-url"
+                    className={s.input}
+                    value={externalUrl}
+                    onChange={(e) => setExternalUrl(e.target.value)}
+                    placeholder="https://"
+                    autoFocus
+                  />
+                </div>
+                <div className={s.modalRowActions}>
+                  <button className={`${s.btn} ${s.btnPrimary}`} onClick={saveExternalUrl}>
+                    <Check size={15} /> Save link
+                  </button>
+                  <button className={s.modalCancel} onClick={() => setFormModalTab("choose")}>
+                    Back
+                  </button>
+                </div>
+                <p className={s.modalHint}>
+                  The Register now button on the website opens this link in a new tab.
+                </p>
+              </>
             )}
 
             {formModalTab === "create" && (
-              <div className="fm-modal-body">
-                <label className="fb-field-label">Form title</label>
-                <input
-                  className="ev-input"
-                  value={newFormTitle}
-                  onChange={(e) => setNewFormTitle(e.target.value)}
-                  placeholder="Register — Event name"
-                />
-
-                <div className="fm-modal-actions-row">
+              <>
+                <div className={s.field}>
+                  <label className={s.label} htmlFor="new-form-title">
+                    Form title
+                  </label>
+                  <input
+                    id="new-form-title"
+                    className={s.input}
+                    value={newFormTitle}
+                    onChange={(e) => setNewFormTitle(e.target.value)}
+                    placeholder="Register — Event name"
+                  />
+                </div>
+                <div className={s.modalRowActions}>
                   <button
-                    className="btn-primary"
+                    className={`${s.btn} ${s.btnPrimary}`}
                     onClick={openBuilderForNewForm}
                     disabled={creatingForm}
                   >
                     {creatingForm ? (
-                      <SpinnerGap size={15} className="spin" />
+                      <SpinnerGap size={15} className={s.spin} />
                     ) : (
                       <ArrowSquareOut size={15} />
                     )}
                     {creatingForm ? "Creating…" : "Open form builder"}
                   </button>
-                  <button className="ev-cancel" onClick={() => setFormModalTab("choose")}>
+                  <button className={s.modalCancel} onClick={() => setFormModalTab("choose")}>
                     Back
                   </button>
                 </div>
-                <p className="fm-modal-hint">
+                <p className={s.modalHint}>
                   The form builder opens — add your questions, press Publish, and you come
                   straight back here with the form attached.
                 </p>
-              </div>
+              </>
             )}
           </div>
         </div>
@@ -1408,46 +1492,50 @@ export default function EventEditorPage({ params }: { params: Promise<{ id: stri
 
       {/* Delete confirmation */}
       {deleteConfirm && (
-        <EditorModal onCancel={() => setDeleteConfirm(false)}>
-          <div className="ev-modal-icon">
-            <Trash size={24} />
+        <div className={s.overlay} onClick={() => setDeleteConfirm(false)}>
+          <div className={s.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={s.modalIcon}>
+              <Trash size={24} />
+            </div>
+            <div className={s.modalTitle}>Delete event?</div>
+            <p className={s.modalText}>
+              “{event.title || "Untitled event"}” will be permanently removed. This action cannot
+              be undone.
+            </p>
+            <div className={s.modalActions}>
+              <button className={s.modalCancel} onClick={() => setDeleteConfirm(false)}>
+                Cancel
+              </button>
+              <button className={s.modalDanger} onClick={handleDelete}>
+                Delete
+              </button>
+            </div>
           </div>
-          <div className="ev-modal-title">Delete event?</div>
-          <p className="ev-modal-text">
-            “{event.title || "Untitled event"}” will be permanently removed. This action cannot be
-            undone.
-          </p>
-          <div className="ev-modal-actions">
-            <button className="ev-modal-cancel" onClick={() => setDeleteConfirm(false)}>
-              Cancel
-            </button>
-            <button className="ev-modal-danger" onClick={handleDelete}>
-              Delete
-            </button>
-          </div>
-        </EditorModal>
+        </div>
       )}
 
       {/* Discard confirmation */}
       {discardConfirm && (
-        <EditorModal onCancel={() => setDiscardConfirm(false)}>
-          <div className="ev-modal-icon" style={{ background: "var(--color-gold-soft)", color: "var(--color-gold-deep)" }}>
-            <ArrowLeft size={24} />
+        <div className={s.overlay} onClick={() => setDiscardConfirm(false)}>
+          <div className={s.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={`${s.modalIcon} ${s.modalIconGold}`}>
+              <Star size={24} />
+            </div>
+            <div className={s.modalTitle}>Discard changes?</div>
+            <p className={s.modalText}>You have unsaved changes. Leaving now will lose them.</p>
+            <div className={s.modalActions}>
+              <button className={s.modalCancel} onClick={() => setDiscardConfirm(false)}>
+                Keep editing
+              </button>
+              <button
+                className={s.modalDanger}
+                onClick={() => router.push("/dashboard/events")}
+              >
+                Discard
+              </button>
+            </div>
           </div>
-          <div className="ev-modal-title">Discard changes?</div>
-          <p className="ev-modal-text">You have unsaved changes. Leaving now will lose them.</p>
-          <div className="ev-modal-actions">
-            <button className="ev-modal-cancel" onClick={() => setDiscardConfirm(false)}>
-              Keep editing
-            </button>
-            <button
-              className="ev-modal-danger"
-              onClick={() => router.push("/dashboard/events")}
-            >
-              Discard
-            </button>
-          </div>
-        </EditorModal>
+        </div>
       )}
     </div>
   );

@@ -28,6 +28,12 @@ const ICONS: Record<string, React.ReactNode> = {
   check: <path d="M20 6L9 17l-5-5" />,
   download: <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />,
   refresh: <path d="M3 12a9 9 0 019-9 9 9 0 016.7 3M21 12a9 9 0 01-9 9 9 9 0 01-6.7-3M21 3v6h-6M3 21v-6h6" />,
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7.2V12l3.4 2" />
+    </>
+  ),
 };
 
 function Icon({ name, size = 20 }: { name: string; size?: number }) {
@@ -150,6 +156,20 @@ export default function SettingsPage() {
         }
       } catch {
         /* offline → defaults stay */
+      }
+
+      /* Autosave lives in prayer_settings, not site_settings — re-read it so
+         this page can never show the fallback copy instead of the real flag. */
+      try {
+        const res = await fetch("/api/prayer/config", { cache: "no-store" });
+        const json = await res.json();
+        if (!cancelled && json?.success && typeof json.config?.autosave === "boolean") {
+          setSettings((cur) =>
+            setPath(cur, "prayer.autosave", json.config.autosave) as SettingsState
+          );
+        }
+      } catch {
+        /* keep the site_settings mirror */
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -194,6 +214,37 @@ export default function SettingsPage() {
     }
   }, []);
 
+  /**
+   * Write the autosave flag to prayer_settings.
+   *
+   * /api/prayer/config's PUT rebuilds the whole row from what it is handed,
+   * so the live config has to be re-read first — sending the flag on its own
+   * would overwrite the stored times with the defaults.
+   */
+  const persistAutosave = useCallback(async (value: boolean) => {
+    try {
+      const current = await fetch("/api/prayer/config", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((b) => (b?.success ? (b.config as Record<string, unknown>) : null));
+      if (!current) throw new Error("Could not read the prayer configuration");
+
+      const res = await fetch("/api/prayer/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config: { ...current, autosave: value } }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!body?.success) throw new Error(body?.error || "Could not save autosave");
+
+      toast.success(value ? "Autosave turned on" : "Autosave turned off");
+      if (body.warning) toast.info(body.warning);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save autosave");
+      // Put the control back where the server still has it.
+      setSettings((cur) => setPath(cur, "prayer.autosave", !value) as SettingsState);
+    }
+  }, []);
+
   const update = useCallback(
     (path: string, value: unknown) => {
       const next = setPath(settings, path, value) as SettingsState;
@@ -202,8 +253,10 @@ export default function SettingsPage() {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => void persist(next), 700);
       applyAppearance(path, value, settings);
+      // A preference rather than content: write it straight away, no debounce.
+      if (path === "prayer.autosave") void persistAutosave(Boolean(value));
     },
-    [persist, settings]
+    [persist, persistAutosave, settings]
   );
 
   const saveNow = useCallback(() => {
@@ -486,7 +539,8 @@ type ManagerRow = {
 const COMPONENT_LABELS: Record<string, string> = {
   overview: "Overview",
   events: "Events",
-  register: "Register",
+  register: "Registrations",
+  responses: "Responses",
   settings: "Settings",
 };
 
@@ -500,6 +554,7 @@ function ManagersSheet({ onClose }: { onClose: () => void }) {
     overview: "read",
     events: "read",
     register: "hide",
+    responses: "read",
     settings: "hide",
   });
 
@@ -611,7 +666,7 @@ function ManagersSheet({ onClose }: { onClose: () => void }) {
     void load();
   }
 
-  const components = ["overview", "events", "register", "settings"];
+  const components = ["overview", "events", "register", "responses", "settings"];
 
   return (
     <div className="oui-sheet" role="dialog" aria-modal="true" aria-label="Managers">

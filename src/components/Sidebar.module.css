@@ -1,0 +1,692 @@
+/* ==========================================================================
+   Sidebar — white canvas.
+   Structure: brand → "Admin Panel" → Search → nav → divider → user row.
+   Collapsed state mirrors the global 260px / 76px app-main margin.
+   ========================================================================== */
+
+.sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  height: 100vh;
+  padding: 20px 14px 14px;
+  background: #ffffff;
+  border-right: 1px solid #e9edea;
+  z-index: 50;
+  transition: width 0.24s var(--ease-out);
+}
+
+/* ── Two panels: the normal nav, and the screens panel ──────────────────── */
+
+/* Both occupy the same box so one can slide out to the left while the other
+   slides in from the right. Clipped, so nothing spills over the page. */
+.panels {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  will-change: transform, opacity;
+}
+
+/* A visible state reveals at once; a hidden one waits out the slide before
+   dropping `visibility`, so an outgoing panel is never cut off mid-motion. */
+.panelMain {
+  transform: translateX(0);
+  opacity: 1;
+  visibility: visible;
+  transition:
+    transform 0.44s var(--ease-out),
+    opacity 0.3s var(--ease-out),
+    visibility 0s linear 0s;
+}
+
+.panelScreens {
+  transform: translateX(100%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform 0.44s var(--ease-out),
+    opacity 0.3s var(--ease-out),
+    visibility 0s linear 0.44s;
+}
+
+.screensOpen .panelMain {
+  transform: translateX(-100%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform 0.44s var(--ease-out),
+    opacity 0.3s var(--ease-out),
+    visibility 0s linear 0.44s;
+}
+
+.screensOpen .panelScreens {
+  transform: translateX(0);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    transform 0.44s var(--ease-out),
+    opacity 0.3s var(--ease-out),
+    visibility 0s linear 0s;
+}
+
+/* The events panel behaves exactly like the screens one, just triggered by
+    a different route prefix (it spans three pages, one per sub-button). */
+.panelEvents {
+  transform: translateX(100%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform 0.44s var(--ease-out),
+    opacity 0.3s var(--ease-out),
+    visibility 0s linear 0.44s;
+}
+
+.eventsOpen .panelMain {
+  transform: translateX(-100%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform 0.44s var(--ease-out),
+    opacity 0.3s var(--ease-out),
+    visibility 0s linear 0.44s;
+}
+
+.eventsOpen .panelEvents {
+  transform: translateX(0);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    transform 0.44s var(--ease-out),
+    opacity 0.3s var(--ease-out),
+    visibility 0s linear 0s;
+}
+
+/* ── Brand ──────────────────────────────────────────────────────────────── */
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 8px 16px;
+  text-align: center;
+}
+
+.brandLogo {
+  display: block;
+  line-height: 0;
+}
+
+.brandLogo img {
+  height: 28px;
+  width: auto;
+}
+
+.eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #9aa79f;
+}
+
+/* ── Search (opens the command palette — wired up later) ────────────────── */
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 40px;
+  padding: 0 8px 0 11px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+  border: 1px solid #e6eae7;
+  border-radius: 11px;
+  background: #fafcfa;
+  color: #7b8a81;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.18s var(--ease-out),
+    border-color 0.18s var(--ease-out),
+    color 0.18s var(--ease-out);
+}
+
+.search:hover {
+  background: #f4f8f5;
+  border-color: #d3ddd6;
+  color: #3a3f3c;
+}
+
+.searchLabel {
+  flex: 1;
+  text-align: left;
+}
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid #dfe4e0;
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: 0 1px 0 rgba(6, 20, 15, 0.06);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7d72;
+}
+
+/* ── Back — the header of the screens panel ─────────────────────────────── */
+
+/* Takes the brand's place so both panels keep the same top rhythm. */
+.backBtn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 11px;
+  margin: 2px 0 18px;
+  flex-shrink: 0;
+  border: 1px solid #e6eae7;
+  border-radius: 11px;
+  background: #fafcfa;
+  color: #3a3f3c;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.18s var(--ease-out),
+    border-color 0.18s var(--ease-out),
+    color 0.18s var(--ease-out),
+    transform 0.18s var(--ease-out);
+}
+
+.backBtn:hover {
+  background: #f4f8f5;
+  border-color: #d3ddd6;
+  color: var(--color-primary);
+}
+
+.backBtn:active {
+  transform: scale(0.985);
+}
+
+.backBtn svg {
+  flex-shrink: 0;
+}
+
+.backLabel {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Nav ────────────────────────────────────────────────────────────────── */
+
+.nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0;
+  scrollbar-width: thin;
+  scrollbar-color: #dfe4e0 transparent;
+}
+
+.nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav::-webkit-scrollbar-thumb {
+  background: #dfe4e0;
+  border-radius: 99px;
+}
+
+.link,
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 9px 11px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #3a3f3c;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 0.18s var(--ease-out),
+    color 0.18s var(--ease-out);
+}
+
+.link:hover,
+.groupHead:hover {
+  background: #f3f7f4;
+  color: #0a0a0a;
+}
+
+.link:active,
+.groupHead:active {
+  background: #edf2ef;
+}
+
+.linkActive,
+.groupHeadActive {
+  background: var(--color-primary-mist);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.link svg,
+.groupHead svg {
+  flex-shrink: 0;
+  transition: color 0.18s var(--ease-out);
+}
+
+.linkActive svg,
+.groupHeadActive svg {
+  color: var(--color-primary);
+}
+
+/* The Screens entry point tints blue instead of theme green — it is the door
+   into a different area of the panel, not another section of this one. */
+.linkScreens:hover,
+.linkScreens:focus-visible {
+  background: #eaf1fe;
+  color: #1a5fd0;
+}
+
+.linkScreens:hover svg,
+.linkScreens:focus-visible svg {
+  color: #1a5fd0;
+}
+
+.linkScreens:active {
+  background: #dce8fd;
+}
+
+/* The Events entry point tints gold — the other door into a slide-in panel. */
+.linkEvents:hover,
+.linkEvents:focus-visible {
+  background: var(--color-gold-soft);
+  color: var(--color-gold-deep);
+}
+
+.linkEvents:hover svg,
+.linkEvents:focus-visible svg {
+  color: var(--color-gold-deep);
+}
+
+.linkEvents:active {
+  background: #ece0c0;
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chev {
+  flex-shrink: 0;
+  color: #a9b4ac;
+  transition: transform 0.22s var(--ease-out);
+}
+
+.chevOpen {
+  transform: rotate(90deg);
+}
+
+/* Nested page links */
+.children {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0 4px 22px;
+}
+
+.child {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 11px;
+  border-radius: 9px;
+  color: #6b7d72;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    background-color 0.18s var(--ease-out),
+    color 0.18s var(--ease-out);
+}
+
+.child:hover {
+  background: #f3f7f4;
+  color: #0a0a0a;
+}
+
+.childActive {
+  background: var(--color-primary-mist);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.childActive svg {
+  color: var(--color-primary);
+}
+
+/* ── Footer: divider + user row ─────────────────────────────────────────── */
+
+.divider {
+  height: 1px;
+  flex-shrink: 0;
+  margin: 10px 4px;
+  background: #eceff0;
+}
+
+.userRow {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.userBtn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.18s var(--ease-out),
+    border-color 0.18s var(--ease-out);
+}
+
+.userBtn:hover,
+.userBtnOpen {
+  background: #f5f8f6;
+  border-color: #e8ece9;
+}
+
+/* Dropdown trigger — sits at the far left of the row. */
+.chevron {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: #9aa79f;
+  transition: transform 0.22s var(--ease-out);
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #ffffff;
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.userMeta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0a0a0a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.email {
+  font-size: 11px;
+  color: #8b988f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Dropdown ───────────────────────────────────────────────────────────── */
+
+.menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid #e8ece9;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 18px 44px -18px rgba(6, 20, 15, 0.32);
+  z-index: 60;
+  animation: menuIn 0.16s var(--ease-out);
+}
+
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: #3a3f3c;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 0.16s var(--ease-out),
+    color 0.16s var(--ease-out);
+}
+
+.menuItem:hover {
+  background: #f3f7f4;
+  color: #0a0a0a;
+}
+
+.menuItem svg {
+  flex-shrink: 0;
+  color: #8b988f;
+}
+
+.menuDanger {
+  color: var(--color-danger);
+}
+
+.menuDanger svg {
+  color: var(--color-danger);
+}
+
+.menuDanger:hover {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.menuSep {
+  height: 1px;
+  margin: 4px 2px;
+  background: #eceff0;
+}
+
+/* ── Collapsed: icon rail ───────────────────────────────────────────────── */
+
+.collapsed {
+  width: 76px;
+  padding: 20px 10px 12px;
+}
+
+.collapsed .brand {
+  align-items: center;
+  padding: 2px 0 14px;
+}
+
+.collapsed .eyebrow {
+  display: none;
+}
+
+.collapsed .brandLogo img {
+  height: 32px;
+}
+
+.collapsed .search {
+  justify-content: center;
+  padding: 0;
+  margin-bottom: 14px;
+}
+
+.collapsed .backBtn {
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.collapsed .backLabel {
+  display: none;
+}
+
+.collapsed .searchLabel,
+.collapsed .kbd,
+.collapsed .label,
+.collapsed .chev,
+.collapsed .chevron,
+.collapsed .userMeta {
+  display: none;
+}
+
+.collapsed .link,
+.collapsed .groupHead {
+  justify-content: center;
+  gap: 0;
+  padding: 11px 0;
+}
+
+.collapsed .children {
+  padding: 2px 0 4px;
+}
+
+.collapsed .child {
+  justify-content: center;
+  gap: 0;
+  padding: 9px 0;
+}
+
+.collapsed .userBtn {
+  justify-content: center;
+  padding: 7px 0;
+}
+
+/* Keep the menu readable when the rail is collapsed. */
+.collapsed .menu {
+  left: 0;
+  right: auto;
+  width: 186px;
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .link,
+  .groupHead,
+  .child,
+  .chev,
+  .chevron,
+  .userBtn,
+  .menuItem,
+  .search,
+  .backBtn {
+    transition: none;
+  }
+
+  /* Panels swap instantly rather than sliding. */
+  .panelMain,
+  .panelScreens,
+  .panelEvents {
+    transition: none;
+  }
+
+  .menu {
+    animation: none;
+  }
+
+  .chevOpen,
+  .chevronOpen {
+    transform: none;
+  }
+}

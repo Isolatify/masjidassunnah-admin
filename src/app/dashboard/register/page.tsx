@@ -135,7 +135,7 @@ export default function RegisterPage() {
     <div onClick={() => setOpenMenu(null)}>
       <div className="page-header">
         <div className="page-eyebrow">Forms &amp; Quizzes</div>
-        <h1>Register</h1>
+        <h1>Registrations</h1>
         <p>Create registration forms, surveys and quizzes — then attach them to events.</p>
       </div>
 

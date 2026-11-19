@@ -7,12 +7,20 @@ export type Access = "hide" | "read" | "write";
 
 export type Perms = Record<string, Access>;
 
-export type ComponentKey = "overview" | "events" | "register" | "settings";
+export type ComponentKey =
+  | "overview"
+  | "events"
+  | "register"
+  | "responses"
+  | "prayer"
+  | "settings";
 
 export const DEFAULT_PERMS: Perms = {
   overview: "read",
   events: "read",
   register: "hide",
+  responses: "read",
+  prayer: "read",
   settings: "hide",
 };
 

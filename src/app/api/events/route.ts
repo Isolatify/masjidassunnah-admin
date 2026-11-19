@@ -7,7 +7,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// register_url / full_image are added by supabase-migration-rls-hardening.sql.
+// register_url / full_image are added by sql/legacy/supabase-migration-rls-hardening.sql.
 // Until that SQL is applied, silently skip those fields instead of failing saves.
 let newColumnsOk: boolean | null = null;
 async function hasRegistrationColumns(): Promise<boolean> {

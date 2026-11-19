@@ -7,6 +7,8 @@ import { useAccess, type Access } from "@/lib/access";
 function componentForPath(pathname: string): string {
   if (pathname.startsWith("/dashboard/events")) return "events";
   if (pathname.startsWith("/dashboard/register")) return "register";
+  if (pathname.startsWith("/dashboard/responses")) return "responses";
+  if (pathname.startsWith("/dashboard/prayer-times")) return "prayer";
   if (pathname.startsWith("/dashboard/settings")) return "settings";
   return "overview";
 }

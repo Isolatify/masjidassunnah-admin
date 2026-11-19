@@ -108,6 +108,17 @@ export const DEFAULT_SETTINGS = {
     featureDonations: true,
     debug: false,
   },
+  prayer: {
+    // The changeable slug that follows the hardcoded Masjidbox prefix.
+    // Fetch URL = https://masjidbox.com/prayer-times/<slug>
+    // API URL    = https://api.masjidbox.com/1.0/masjidbox/landing/athany/<slug>
+    slug: "masjidassunnah",
+    // Mirrors `prayer_settings.autosave` — the toggle lives here in Settings
+    // rather than on each prayer page. /api/prayer/config stays authoritative
+    // (the Settings page re-reads it on load); this copy is the offline
+    // fallback so the page still renders a sensible value if that read fails.
+    autosave: true,
+  },
 } as const;
 
 export type Settings = typeof DEFAULT_SETTINGS;
@@ -156,6 +167,20 @@ export const SECTIONS: SectionDef[] = [
         ],
       },
       { key: "site.maintenance", label: "Maintenance mode", hint: "Shows a maintenance notice on the public site.", type: "toggle" },
+    ],
+  },
+  {
+    id: "prayer-times",
+    title: "Prayer times",
+    subtitle: "Autosave behaviour for the prayer pages",
+    icon: "clock",
+    fields: [
+      {
+        key: "prayer.autosave",
+        label: "Autosave changes",
+        hint: "When on, every edit on the Athan, Iqamah, Other Prayers and Salah Duration pages is written immediately and those pages show no Save button. Turn it off to review changes and press Save yourself.",
+        type: "toggle",
+      },
     ],
   },
   {
@@ -347,6 +372,41 @@ export const SECTIONS: SectionDef[] = [
   },
 ];
 
+/* Prayer settings live on their own dedicated page (/dashboard/prayer-settings),
+   so this section is intentionally kept out of the main SECTIONS list (it won't
+   show in the general Settings drill-in). Its fields are still registered with
+   the settings API via allFieldKeys() below. */
+export const PRAYER_SECTION: SectionDef = {
+  id: "prayer",
+  title: "Prayer times source",
+  subtitle: "Where athan & iqamah times are fetched from",
+  icon: "clock",
+  fields: [
+    {
+      key: "prayer.slug",
+      label: "Masjidbox slug",
+      hint: "The segment after https://masjidbox.com/prayer-times/. Changing it re-points every prayer container everywhere.",
+      type: "text",
+      placeholder: "masjidassunnah",
+    },
+  ],
+};
+
+/* The Masjidbox prefix is fixed; only the slug after it is changeable. */
+export const MASJIDBOX_WIDGET_PREFIX = "https://masjidbox.com/prayer-times/";
+export const MASJIDBOX_API_PREFIX = "https://api.masjidbox.com/1.0/masjidbox/landing/athany/";
+export const DEFAULT_PRAYER_SLUG = "masjidassunnah";
+
+export function prayerWidgetUrl(slug: string): string {
+  return `${MASJIDBOX_WIDGET_PREFIX}${slug || DEFAULT_PRAYER_SLUG}`;
+}
+export function prayerApiUrl(slug: string): string {
+  return `${MASJIDBOX_API_PREFIX}${slug || DEFAULT_PRAYER_SLUG}`;
+}
+export function normaliseSlug(input: string): string {
+  return input.trim().replace(/^\/+|\/+$/g, "");
+}
+
 export function getPath(obj: unknown, path: string): unknown {
   return path.split(".").reduce<unknown>((acc, part) => {
     if (acc && typeof acc === "object") return (acc as Record<string, unknown>)[part];
@@ -383,5 +443,5 @@ export function mergeSettings<T extends object>(base: T, incoming: unknown): T {
 }
 
 export function allFieldKeys(): string[] {
-  return SECTIONS.flatMap((s) => s.fields.map((f) => f.key));
+  return [...SECTIONS, PRAYER_SECTION].flatMap((s) => s.fields.map((f) => f.key));
 }

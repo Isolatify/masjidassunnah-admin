@@ -1,0 +1,493 @@
+/* ==========================================================================
+   Events — the section's two pages (list + overview) share one stylesheet:
+   the header (eyebrow / display title / sub + actions), the five-card stats
+   row, the latest-event spotlight beside the 30-day trend chart, the three
+   list panels (upcoming / latest responses / most viewed) and the sortable
+   all-events table. Everything sits on the admin shell's white panels with
+   the global gold accents — same tokens as .page-header / .stat-card /
+   .panel / .rsp-table in globals.css.
+   ========================================================================== */
+
+/* -- Header ------------------------------------------------------------- */
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px 32px;
+  margin-bottom: 30px;
+}
+
+.head > :global(.page-header) {
+  margin-bottom: 0;
+}
+
+/* The header's right-hand side: the cross-link to the section's other page
+   next to the primary New Event button. */
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* -- Stat card sub-line -------------------------------------------------- */
+
+.sub {
+  display: block;
+  margin-top: 7px;
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--color-muted);
+}
+
+/* -- Rows ---------------------------------------------------------------- */
+
+.row2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.row3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 1180px) {
+  .row2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .row3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* -- Spotlight: the latest event ----------------------------------------- */
+
+.spot {
+  display: flex;
+  gap: 18px;
+}
+
+.spotCover {
+  flex: 0 0 168px;
+  width: 168px;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-bg-slab);
+  border: 1px solid var(--color-border-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted);
+}
+
+.spotCover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.spotBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.spotBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.spotTitle {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: clamp(18px, 1.8vw, 23px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+.spotMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 16px;
+  margin-bottom: 16px;
+}
+
+.spotMeta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--color-muted);
+}
+
+.spotMetrics {
+  display: flex;
+  gap: 26px;
+  padding: 13px 0;
+  margin-bottom: 16px;
+  border-top: 1px solid var(--color-border-soft);
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.spotMetrics div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.spotMetrics strong {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+  line-height: 1;
+}
+
+.spotMetrics span {
+  font-family: var(--font-heading);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.spotActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: auto;
+}
+
+/* -- Trend chart --------------------------------------------------------- */
+
+.chart {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.chartLegend {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.chartLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.dotViews {
+  background: var(--color-primary);
+}
+
+.dotResps {
+  background: var(--color-gold);
+}
+
+.chartBars {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 168px;
+  padding-top: 6px;
+}
+
+.chartCol {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+}
+
+.bar {
+  display: block;
+  width: 50%;
+  max-width: 9px;
+  border-radius: 3px 3px 1px 1px;
+  transition: height 0.5s var(--ease-out);
+}
+
+.barViews {
+  background: var(--color-primary);
+}
+
+.barResps {
+  background: var(--color-gold);
+}
+
+.chartAxis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 9px;
+  font-size: 10.5px;
+  color: var(--color-muted);
+}
+
+/* -- List panels --------------------------------------------------------- */
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 25px;
+  height: 25px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--color-gold-soft);
+  color: var(--color-gold-deep);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.rowBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 8px;
+  margin: 0 -8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s var(--ease-out);
+}
+
+.rowBtn:hover,
+.rowBtn:focus-visible {
+  background: var(--color-surface-muted);
+}
+
+.rowBtn + .rowBtn {
+  border-top: 1px solid var(--color-border-soft);
+}
+
+/* The global list spans are inline by design (other pages wrap them in
+   blocks). Inside these stacked rows they must sit on their own line. */
+.rowBtn :global(.list-info),
+.rowBtn :global(.list-name),
+.rowBtn :global(.list-detail),
+.listItem :global(.list-name),
+.listItem :global(.list-detail) {
+  display: block;
+}
+
+.dateChip {
+  flex: 0 0 auto;
+  width: 44px;
+  padding: 6px 0 5px;
+  border-radius: var(--radius-sm);
+  background: var(--color-gold-soft);
+  color: var(--color-gold-deep);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.dateChip b {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.dateChip i {
+  font-style: normal;
+  font-family: var(--font-heading);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+
+.rowHint {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+/* The date chip already carries day + month, so the trailing hint earns its
+   place only by saying something else — the weekday. */
+.rowBtn :global(.list-item) {
+  padding: 9px 0;
+}
+
+.rowHintWeekday {
+  text-transform: capitalize;
+}
+
+.rowHintLink {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.rowHintLink:hover {
+  text-decoration: underline;
+}
+
+.miniIcon {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--color-gold-soft);
+  color: var(--color-gold-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewBar {
+  display: block;
+  height: 5px;
+  margin-top: 7px;
+  border-radius: 3px;
+  background: var(--color-bg-slab);
+  overflow: hidden;
+}
+
+.viewBarFill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--color-primary);
+}
+
+/* -- All-events table ---------------------------------------------------- */
+
+.arrow {
+  font-style: normal;
+  font-size: 9px;
+  color: var(--color-gold-deep);
+}
+
+.thPlain span {
+  cursor: default;
+}
+
+.evCell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 340px;
+}
+
+.evCell b {
+  font-family: var(--font-heading);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evCell span {
+  font-size: 11.5px;
+  color: var(--color-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellLink {
+  font-weight: 700;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.cellLink:hover {
+  text-decoration: underline;
+}
+
+.numCell {
+  font-variant-numeric: tabular-nums;
+}
+
+.rowActions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.iconBtn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition:
+    background 0.2s var(--ease-out),
+    color 0.2s var(--ease-out),
+    border-color 0.2s var(--ease-out);
+}
+
+.iconBtn:hover:not(:disabled) {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  color: var(--color-ink);
+}
+
+.iconBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.iconBtnDanger:hover:not(:disabled) {
+  background: var(--color-danger-soft);
+  border-color: transparent;
+  color: var(--color-danger);
+}
